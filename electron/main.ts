@@ -5,6 +5,14 @@ import fs from 'node:fs'
 import os from 'node:os'
 import ffmpeg from 'fluent-ffmpeg'
 import ffmpegStatic from 'ffmpeg-static'
+import dotenv from 'dotenv'
+import { TranscriptionServiceManager } from '../src/services/transcription'
+
+// Load environment variables
+dotenv.config()
+
+// Initialize transcription service manager
+const transcriptionManager = new TranscriptionServiceManager()
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
@@ -25,13 +33,9 @@ async function convertToMp3(inputPath: string, outputDir: string): Promise<strin
       .on('end', () => {
         console.log('Conversion finished successfully')
         resolve(outputPath)
-      })
-      .on('error', (err) => {
+      })      .on('error', (err) => {
         console.error('Error during conversion:', err)
         reject(err)
-      })      .on('progress', (progress) => {
-        const percent = progress.percent ? Math.round(progress.percent) : 0;
-        console.log(`Processing: ${percent}% done`);
       })
       .save(outputPath)
   })
@@ -136,6 +140,30 @@ ipcMain.handle('copy-file', async (_, sourcePath: string, targetPath: string) =>
   } catch (error) {
     console.error('Error copying file:', error)
     return { success: false, error: error instanceof Error ? error.message : 'Unknown error' }
+  }
+})
+
+// Transcription handlers
+ipcMain.handle('get-transcription-providers', async () => {
+  try {
+    const providers = transcriptionManager.getAvailableProviders()
+    return { success: true, providers }
+  } catch (error) {
+    console.error('Error getting transcription providers:', error)
+    return { success: false, error: error instanceof Error ? error.message : 'Unknown error' }
+  }
+})
+
+ipcMain.handle('transcribe-audio', async (_, request: any) => {
+  try {
+    const result = await transcriptionManager.transcribe(request)
+    return result
+  } catch (error) {
+    console.error('Error transcribing audio:', error)
+    return { 
+      success: false, 
+      error: error instanceof Error ? error.message : 'Unknown error' 
+    }
   }
 })
 

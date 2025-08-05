@@ -95,6 +95,14 @@ const TranscriptionPanel: React.FC<TranscriptionPanelProps> = ({ file }) => {
                       </span>
                     </div>
                   )}
+                  {file.transcriptionProvider && (
+                    <div className="flex items-center space-x-1">
+                      <span className="text-xs px-2 py-1 bg-blue-100 text-blue-800 rounded-full">
+                        {file.transcriptionProvider.toUpperCase()}
+                        {file.transcriptionModel && ` • ${file.transcriptionModel}`}
+                      </span>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>

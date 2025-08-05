@@ -2,6 +2,7 @@ import React, { useCallback, useState } from 'react';
 import { Upload, FileAudio, FileVideo, X } from 'lucide-react';
 import { TranscriptionFile, UploadProgress } from '../types';
 import { useAudioConverter } from '../hooks/useAudioConverter';
+import TranscriptionProviderSelector from './TranscriptionProviderSelector';
 
 interface FileUploadProps {
   onFilesUploaded: (files: TranscriptionFile[]) => void;
@@ -10,7 +11,9 @@ interface FileUploadProps {
 const FileUpload: React.FC<FileUploadProps> = ({ onFilesUploaded }) => {
   const [isDragOver, setIsDragOver] = useState(false);
   const [uploadProgress, setUploadProgress] = useState<UploadProgress[]>([]);
-  const { convertAudioFile, conversionProgress } = useAudioConverter();
+  const [selectedProvider, setSelectedProvider] = useState<string | null>(null);
+  const [selectedModel, setSelectedModel] = useState<string | null>(null);
+  const { convertAudioFile } = useAudioConverter();
 
   const acceptedMimeTypes = [
     'audio/mp3',
@@ -51,7 +54,46 @@ const FileUpload: React.FC<FileUploadProps> = ({ onFilesUploaded }) => {
     const minutes = Math.floor(Math.random() * 15) + 1; // 1-15 minutes
     const seconds = Math.floor(Math.random() * 60); // 0-59 seconds
     return `${minutes}:${seconds.toString().padStart(2, '0')}`;
-  };  const needsConversion = (file: File): boolean => {
+  };  const handleProviderChange = (provider: string, model: string) => {
+    setSelectedProvider(provider);
+    setSelectedModel(model);
+  };
+
+  const transcribeAudio = async (filePath: string, fileId: string): Promise<{ text: string; language?: string; duration?: string }> => {
+    if (!window.electronAPI || !selectedProvider || !selectedModel) {
+      return { text: simulateTranscription() };
+    }
+
+    try {
+      const result = await window.electronAPI.transcribeAudio({
+        filePath,
+        provider: selectedProvider,
+        model: selectedModel,
+      });
+
+      if (result.success && result.text) {
+        return {
+          text: result.text,
+          language: result.language,
+          duration: result.duration ? formatDuration(result.duration) : undefined,
+        };
+      } else {
+        console.error('Transcription failed:', result.error);
+        return { text: simulateTranscription() };
+      }
+    } catch (error) {
+      console.error('Error during transcription:', error);
+      return { text: simulateTranscription() };
+    }
+  };
+
+  const formatDuration = (durationInSeconds: number): string => {
+    const minutes = Math.floor(durationInSeconds / 60);
+    const seconds = Math.floor(durationInSeconds % 60);
+    return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+  };
+
+  const needsConversion = (file: File): boolean => {
     const videoExtensions = ['mp4', 'mov', 'avi', 'mkv'];
     const audioExtensions = ['wav', 'm4a', 'aac', 'ogg'];
     const extension = file.name.split('.').pop()?.toLowerCase();
@@ -133,18 +175,20 @@ const FileUpload: React.FC<FileUploadProps> = ({ onFilesUploaded }) => {
           isConverted = true;
           convertedPath = `converted_${file.name.replace(/\.[^/.]+$/, "")}.mp3`;
         }
-      }
-
-      // Simulate transcription processing
+      }      // Transcription processing
       setUploadProgress(prev => 
         prev.map(p => 
           p.fileId === progressItem.fileId 
-            ? { ...p, status: 'processing', progress: 0 }
+            ? { ...p, status: 'transcribing', progress: 0 }
             : p
         )
       );
 
-      // Simulate transcription progress
+      // Perform actual transcription
+      const audioFilePath = convertedPath || file.name;
+      const transcriptionResult = await transcribeAudio(audioFilePath, progressItem.fileId);
+
+      // Simulate transcription progress for UI feedback
       for (let progress = 0; progress <= 100; progress += 25) {
         setUploadProgress(prev => 
           prev.map(p => 
@@ -162,13 +206,15 @@ const FileUpload: React.FC<FileUploadProps> = ({ onFilesUploaded }) => {
         name: file.name,
         size: file.size,
         type: file.type,
-        content: simulateTranscription(),
-        language: detectLanguage(),
-        duration: generateRandomDuration(),
+        content: transcriptionResult.text,
+        language: transcriptionResult.language || detectLanguage(),
+        duration: transcriptionResult.duration || generateRandomDuration(),
         uploadedAt: new Date(),
         originalPath: file.name,
         convertedPath,
-        isConverted
+        isConverted,
+        transcriptionProvider: selectedProvider || undefined,
+        transcriptionModel: selectedModel || undefined,
       };
 
       processedFiles.push(transcriptionFile);
@@ -258,8 +304,8 @@ const FileUpload: React.FC<FileUploadProps> = ({ onFilesUploaded }) => {
                         ? 'bg-emerald-500' 
                         : item.status === 'converting'
                         ? 'bg-orange-500 animate-pulse'
-                        : item.status === 'processing'
-                        ? 'bg-blue-500 animate-pulse'
+                        : item.status === 'transcribing'
+                        ? 'bg-purple-500 animate-pulse'
                         : item.status === 'error'
                         ? 'bg-red-500'
                         : 'bg-blue-500'
@@ -270,7 +316,7 @@ const FileUpload: React.FC<FileUploadProps> = ({ onFilesUploaded }) => {
                 <div className="flex justify-between items-center mt-1">                  <span className="text-xs text-gray-500">
                     {item.status === 'uploading' && 'Enviando...'}
                     {item.status === 'converting' && 'Convertendo para MP3...'}
-                    {item.status === 'processing' && 'Transcrevendo...'}
+                    {item.status === 'transcribing' && 'Transcrevendo...'}
                     {item.status === 'completed' && 'Concluído!'}
                     {item.status === 'error' && 'Erro no processamento'}
                   </span>
@@ -283,9 +329,14 @@ const FileUpload: React.FC<FileUploadProps> = ({ onFilesUploaded }) => {
       </div>
     );
   }
-
   return (
     <div className="max-w-2xl mx-auto">
+      <TranscriptionProviderSelector
+        selectedProvider={selectedProvider}
+        selectedModel={selectedModel}
+        onProviderChange={handleProviderChange}
+      />
+      
       <div
         className={`relative border-2 border-dashed rounded-xl p-12 text-center transition-all duration-200 ${
           isDragOver

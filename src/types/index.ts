@@ -10,6 +10,8 @@ export interface TranscriptionFile {
   originalPath?: string;
   convertedPath?: string;
   isConverted?: boolean;
+  transcriptionProvider?: string;
+  transcriptionModel?: string;
 }
 
 export interface TranscriptionGroup {
@@ -23,5 +25,8 @@ export interface UploadProgress {
   fileId: string;
   fileName: string;
   progress: number;
-  status: 'uploading' | 'converting' | 'processing' | 'completed' | 'error';
+  status: 'uploading' | 'converting' | 'transcribing' | 'completed' | 'error';
 }
+
+// Re-export transcription types
+export * from './transcription';

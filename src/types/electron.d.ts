@@ -1,4 +1,6 @@
 // Types for Electron IPC API
+import { TranscriptionProvider, TranscriptionRequest, TranscriptionResponse } from './transcription';
+
 export interface ElectronAPI {
   convertAudio: (filePath: string) => Promise<{
     success: boolean;
@@ -18,16 +20,22 @@ export interface ElectronAPI {
     success: boolean;
     error?: string;
   }>;
+  getTranscriptionProviders: () => Promise<{
+    success: boolean;
+    providers?: TranscriptionProvider[];
+    error?: string;
+  }>;
+  transcribeAudio: (request: TranscriptionRequest) => Promise<TranscriptionResponse>;
 }
 
 declare global {
   interface Window {
     electronAPI: ElectronAPI;
     ipcRenderer: {
-      on: (channel: string, func: (...args: any[]) => void) => void;
-      off: (channel: string, func: (...args: any[]) => void) => void;
-      send: (channel: string, ...args: any[]) => void;
-      invoke: (channel: string, ...args: any[]) => Promise<any>;
+      on: (channel: string, func: (...args: unknown[]) => void) => void;
+      off: (channel: string, func: (...args: unknown[]) => void) => void;
+      send: (channel: string, ...args: unknown[]) => void;
+      invoke: (channel: string, ...args: unknown[]) => Promise<unknown>;
     };
   }
 }
