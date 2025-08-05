@@ -46,14 +46,6 @@ const Sidebar: React.FC<SidebarProps> = ({
     return words.length > 50 ? words.substring(0, 50) + "..." : words;
   };
 
-  const formatFileSize = (bytes: number) => {
-    if (bytes === 0) return "0 Bytes";
-    const k = 1024;
-    const sizes = ["Bytes", "KB", "MB", "GB"];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + " " + sizes[i];
-  };
-
   const formatDate = (date: Date) => {
     return new Intl.DateTimeFormat("pt-BR", {
       day: "2-digit",

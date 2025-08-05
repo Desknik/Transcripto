@@ -15,7 +15,7 @@ const FileUpload: React.FC<FileUploadProps> = ({ onFilesUploaded }) => {
   const [selectedModel, setSelectedModel] = useState<string | null>(null);
   const { convertAudioFile } = useAudioConverter();
 
-  const acceptedMimeTypes = [
+  const acceptedMimeTypes = React.useMemo(() => [
     'audio/mp3',
     'audio/mpeg', // para mp3
     'audio/wav',
@@ -30,21 +30,9 @@ const FileUpload: React.FC<FileUploadProps> = ({ onFilesUploaded }) => {
     'video/mov',
     'video/avi',
     'video/mkv',
-  ];
-  const acceptedExtensionsArray = ['mp3','wav','m4a','aac','ogg','mp4','mov','avi','mkv'];
+  ], []);
+  const acceptedExtensionsArray = React.useMemo(() => ['mp3','wav','m4a','aac','ogg','mp4','mov','avi','mkv'], []);
   const acceptedExtensions = '.mp3,.wav,.m4a,.aac,.ogg,.mp4,.mov,.avi,.mkv';
-
-  const simulateTranscription = (): string => {
-    const samples = [
-      "Olá, bem-vindos ao nosso podcast sobre tecnologia. Hoje vamos falar sobre inteligência artificial e como ela está transformando o mundo dos negócios.",
-      "Esta é uma reunião importante onde discutiremos os próximos passos do projeto. Precisamos alinhar as expectativas e definir os prazos.",
-      "Gravação de uma aula sobre programação em React. Vamos aprender sobre hooks, componentes funcionais e gerenciamento de estado.",
-      "Entrevista com o CEO da empresa sobre as novas tendências do mercado e os planos de expansão para o próximo ano.",
-      "Apresentação dos resultados do último trimestre e análise das métricas de performance da equipe de vendas."
-    ];
-    return samples[Math.floor(Math.random() * samples.length)];
-  };
-
   const detectLanguage = (): string => {
     const languages = ['pt-BR', 'en-US', 'es-ES'];
     return languages[Math.floor(Math.random() * languages.length)];
@@ -54,14 +42,16 @@ const FileUpload: React.FC<FileUploadProps> = ({ onFilesUploaded }) => {
     const minutes = Math.floor(Math.random() * 15) + 1; // 1-15 minutes
     const seconds = Math.floor(Math.random() * 60); // 0-59 seconds
     return `${minutes}:${seconds.toString().padStart(2, '0')}`;
-  };  const handleProviderChange = (provider: string, model: string) => {
+  };const handleProviderChange = (provider: string, model: string) => {
     setSelectedProvider(provider);
     setSelectedModel(model);
   };
-
-  const transcribeAudio = async (filePath: string, fileId: string): Promise<{ text: string; language?: string; duration?: string }> => {
+  const transcribeAudio = async (filePath: string): Promise<{ success: boolean; text?: string; language?: string; duration?: string; error?: string }> => {
     if (!window.electronAPI || !selectedProvider || !selectedModel) {
-      return { text: simulateTranscription() };
+      return { 
+        success: false, 
+        error: 'API não disponível ou provedor de transcrição não selecionado' 
+      };
     }
 
     try {
@@ -73,17 +63,24 @@ const FileUpload: React.FC<FileUploadProps> = ({ onFilesUploaded }) => {
 
       if (result.success && result.text) {
         return {
+          success: true,
           text: result.text,
           language: result.language,
           duration: result.duration ? formatDuration(result.duration) : undefined,
         };
       } else {
         console.error('Transcription failed:', result.error);
-        return { text: simulateTranscription() };
+        return { 
+          success: false, 
+          error: result.error || 'Erro desconhecido na transcrição' 
+        };
       }
     } catch (error) {
       console.error('Error during transcription:', error);
-      return { text: simulateTranscription() };
+      return { 
+        success: false, 
+        error: error instanceof Error ? error.message : 'Erro de conexão com o serviço de transcrição' 
+      };
     }
   };
 
@@ -186,7 +183,27 @@ const FileUpload: React.FC<FileUploadProps> = ({ onFilesUploaded }) => {
 
       // Perform actual transcription
       const audioFilePath = convertedPath || file.name;
-      const transcriptionResult = await transcribeAudio(audioFilePath, progressItem.fileId);
+      const transcriptionResult = await transcribeAudio(audioFilePath);      // Check if transcription failed
+      if (!transcriptionResult.success) {
+        console.error('Transcription failed:', transcriptionResult.error);
+        
+        // Set error status
+        setUploadProgress(prev => 
+          prev.map(p => 
+            p.fileId === progressItem.fileId 
+              ? { 
+                  ...p, 
+                  status: 'error', 
+                  progress: 100, 
+                  errorMessage: transcriptionResult.error || 'Erro desconhecido na transcrição' 
+                }
+              : p
+          )
+        );
+        
+        // Skip adding this file to processed files and continue with next file
+        continue;
+      }
 
       // Simulate transcription progress for UI feedback
       for (let progress = 0; progress <= 100; progress += 25) {
@@ -206,7 +223,7 @@ const FileUpload: React.FC<FileUploadProps> = ({ onFilesUploaded }) => {
         name: file.name,
         size: file.size,
         type: file.type,
-        content: transcriptionResult.text,
+        content: transcriptionResult.text || '',
         language: transcriptionResult.language || detectLanguage(),
         duration: transcriptionResult.duration || generateRandomDuration(),
         uploadedAt: new Date(),
@@ -225,14 +242,21 @@ const FileUpload: React.FC<FileUploadProps> = ({ onFilesUploaded }) => {
             ? { ...p, status: 'completed' }
             : p
         )
-      );
-    }
+      );    }
+
+    // Check if there are any errors to show them longer
+    const hasErrors = newProgress.some(p => p.status === 'error');
+    const delayTime = hasErrors ? 5000 : 1000; // 5 seconds for errors, 1 second for success
 
     // Clear progress after a brief delay
     setTimeout(() => {
       setUploadProgress([]);
-      onFilesUploaded(processedFiles);
-    }, 1000);
+      
+      // Only create groups if there are successfully processed files
+      if (processedFiles.length > 0) {
+        onFilesUploaded(processedFiles);
+      }
+    }, delayTime);
   };
 
   const handleDrop = useCallback((e: React.DragEvent) => {
@@ -251,7 +275,7 @@ const FileUpload: React.FC<FileUploadProps> = ({ onFilesUploaded }) => {
     if (files.length > 0) {
       processFiles(files);
     }
-  }, []);
+  }, [acceptedMimeTypes, acceptedExtensionsArray, processFiles]);
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
@@ -313,15 +337,27 @@ const FileUpload: React.FC<FileUploadProps> = ({ onFilesUploaded }) => {
                     style={{ width: `${item.progress}%` }}
                   />
                 </div>
-                <div className="flex justify-between items-center mt-1">                  <span className="text-xs text-gray-500">
+                <div className="flex justify-between items-center mt-1">
+                  <span className="text-xs text-gray-500">
                     {item.status === 'uploading' && 'Enviando...'}
                     {item.status === 'converting' && 'Convertendo para MP3...'}
                     {item.status === 'transcribing' && 'Transcrevendo...'}
                     {item.status === 'completed' && 'Concluído!'}
-                    {item.status === 'error' && 'Erro no processamento'}
+                    {item.status === 'error' && (
+                      <span className="text-red-600">
+                        {item.errorMessage || 'Erro no processamento'}
+                      </span>
+                    )}
                   </span>
-                  <span className="text-xs text-gray-500">{item.progress}%</span>
+                  {item.status !== 'error' && (
+                    <span className="text-xs text-gray-500">{item.progress}%</span>
+                  )}
                 </div>
+                {item.status === 'error' && item.errorMessage && (
+                  <div className="mt-2 p-2 bg-red-50 border border-red-200 rounded text-xs text-red-700">
+                    <strong>Erro:</strong> {item.errorMessage}
+                  </div>
+                )}
               </div>
             ))}
           </div>

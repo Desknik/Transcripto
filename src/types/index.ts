@@ -26,6 +26,7 @@ export interface UploadProgress {
   fileName: string;
   progress: number;
   status: 'uploading' | 'converting' | 'transcribing' | 'completed' | 'error';
+  errorMessage?: string;
 }
 
 // Re-export transcription types

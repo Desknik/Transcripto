@@ -1,6 +1,6 @@
 import { BaseTranscriptionService } from './base';
 import { OpenAITranscriptionService } from './openai';
-import { TranscriptionProvider, TranscriptionRequest, TranscriptionResponse } from '../types/transcription';
+import { TranscriptionProvider, TranscriptionRequest, TranscriptionResponse } from '../../types/transcription';
 
 export class TranscriptionServiceManager {
   private services: Map<string, BaseTranscriptionService> = new Map();
@@ -13,9 +13,11 @@ export class TranscriptionServiceManager {
   private initializeServices(): void {
     // For now, we'll get API keys from environment variables
     // In the future, this could be from user settings or database
-    
-    const openaiKey = process.env.OPENAI_API_KEY;
-    if (openaiKey && openaiKey !== 'your_openai_api_key_here') {
+      const openaiKey = process.env.OPENAI_API_KEY;
+    if (openaiKey && 
+        openaiKey !== 'your_openai_api_key_here' && 
+        openaiKey.trim() !== '' && 
+        openaiKey.startsWith('sk-')) {
       this.services.set('openai', new OpenAITranscriptionService(openaiKey));
     }
 

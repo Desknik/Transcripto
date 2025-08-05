@@ -1,9 +1,12 @@
-import { TranscriptionRequest, TranscriptionResponse, TranscriptionProvider } from '../types/transcription';
+import { TranscriptionRequest, TranscriptionResponse, TranscriptionProvider } from '../../types/transcription';
 
 export abstract class BaseTranscriptionService {
   abstract getProvider(): TranscriptionProvider;
   abstract transcribe(request: TranscriptionRequest): Promise<TranscriptionResponse>;
   
+  // Optional method to test API connection
+  async testConnection?(): Promise<{ success: boolean; error?: string }>;
+
   protected validateRequest(request: TranscriptionRequest): void {
     if (!request.filePath) {
       throw new Error('File path is required');
