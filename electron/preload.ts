@@ -28,4 +28,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.invoke('save-file-to-disk', Buffer.from(fileBuffer), fileName),
   copyFile: (sourcePath: string, targetPath: string) => 
     ipcRenderer.invoke('copy-file', sourcePath, targetPath),
+  
+  // Transcription APIs
+  getTranscriptionProviders: () => ipcRenderer.invoke('get-transcription-providers'),
+  transcribeAudio: (request: any) => ipcRenderer.invoke('transcribe-audio', request),
 })
