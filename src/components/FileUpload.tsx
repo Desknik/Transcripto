@@ -244,19 +244,27 @@ const FileUpload: React.FC<FileUploadProps> = ({ onFilesUploaded }) => {
         )
       );    }
 
-    // Check if there are any errors to show them longer
-    const hasErrors = newProgress.some(p => p.status === 'error');
-    const delayTime = hasErrors ? 5000 : 1000; // 5 seconds for errors, 1 second for success
+    // Create groups for successfully processed files immediately
+    if (processedFiles.length > 0) {
+      onFilesUploaded(processedFiles);
+    }
 
-    // Clear progress after a brief delay
+    // Use a small delay to check the final state after all updates
     setTimeout(() => {
-      setUploadProgress([]);
-      
-      // Only create groups if there are successfully processed files
-      if (processedFiles.length > 0) {
-        onFilesUploaded(processedFiles);
-      }
-    }, delayTime);
+      setUploadProgress(currentProgress => {
+        const hasErrors = currentProgress.some(p => p.status === 'error');
+        
+        if (!hasErrors) {
+          // Only auto-clear if NO errors - all files were successful
+          setTimeout(() => {
+            setUploadProgress([]);
+          }, 1000);
+        }
+        // If there are errors, keep them visible until user manually clears
+        
+        return currentProgress;
+      });
+    }, 100);
   };
 
   const handleDrop = useCallback((e: React.DragEvent) => {
@@ -291,18 +299,47 @@ const FileUpload: React.FC<FileUploadProps> = ({ onFilesUploaded }) => {
     }
     return <FileAudio className="w-5 h-5 text-emerald-500" />;
   };
-
   const removeUploadItem = (fileId: string) => {
     setUploadProgress(prev => prev.filter(p => p.fileId !== fileId));
   };
-
+  const clearAllErrors = () => {
+    setUploadProgress([]);
+  };
   if (uploadProgress.length > 0) {
+    const hasErrors = uploadProgress.some(item => item.status === 'error');
+    const hasCompleted = uploadProgress.some(item => item.status === 'completed');
+    const hasProcessing = uploadProgress.some(item => ['uploading', 'converting', 'transcribing'].includes(item.status));
+
     return (
       <div className="max-w-2xl mx-auto">
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4">
-            Processando arquivos...
-          </h3>
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-lg font-semibold text-gray-900">
+              {hasProcessing ? 'Processando arquivos...' : hasErrors ? 'Processamento concluído com erros' : 'Processamento concluído'}
+            </h3>
+            
+            {/* Action buttons when not processing */}
+            {!hasProcessing && (
+              <div className="flex space-x-2">
+                {hasErrors && (
+                  <button
+                    onClick={clearAllErrors}
+                    className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm rounded-lg font-medium transition-colors"
+                  >
+                    Nova Transcrição
+                  </button>
+                )}
+                {(hasCompleted || hasErrors) && (
+                  <button
+                    onClick={clearAllErrors}
+                    className="px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white text-sm rounded-lg font-medium transition-colors"
+                  >
+                    Limpar Lista
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
           <div className="space-y-4">
             {uploadProgress.map((item) => (
               <div key={item.fileId} className="relative">
@@ -358,9 +395,29 @@ const FileUpload: React.FC<FileUploadProps> = ({ onFilesUploaded }) => {
                     <strong>Erro:</strong> {item.errorMessage}
                   </div>
                 )}
-              </div>
-            ))}
+              </div>            ))}
           </div>
+          
+          {/* Additional help message for errors */}
+          {hasErrors && !hasProcessing && (
+            <div className="mt-6 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+              <div className="flex items-start">
+                <div className="flex-shrink-0">
+                  <svg className="w-5 h-5 text-yellow-400" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd"/>
+                  </svg>
+                </div>
+                <div className="ml-3">
+                  <h4 className="text-sm font-medium text-yellow-800">
+                    Alguns arquivos falharam na transcrição
+                  </h4>
+                  <p className="text-sm text-yellow-700 mt-1">
+                    Verifique se sua chave da API OpenAI está configurada corretamente no arquivo .env e se você tem créditos disponíveis.
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     );
