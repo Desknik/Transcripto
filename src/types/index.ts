@@ -7,6 +7,9 @@ export interface TranscriptionFile {
   language?: string;
   duration?: string;
   uploadedAt: Date;
+  originalPath?: string;
+  convertedPath?: string;
+  isConverted?: boolean;
 }
 
 export interface TranscriptionGroup {
@@ -20,5 +23,5 @@ export interface UploadProgress {
   fileId: string;
   fileName: string;
   progress: number;
-  status: 'uploading' | 'processing' | 'completed' | 'error';
+  status: 'uploading' | 'converting' | 'processing' | 'completed' | 'error';
 }

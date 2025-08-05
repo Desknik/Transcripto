@@ -1,12 +1,15 @@
 import React from 'react';
-import { FileAudio, FileVideo, Globe } from 'lucide-react';
+import { FileAudio, FileVideo, Globe, Download } from 'lucide-react';
 import { TranscriptionFile } from '../types';
+import { useAudioConverter } from '../hooks/useAudioConverter';
 
 interface TranscriptionPanelProps {
   file: TranscriptionFile | null;
 }
 
 const TranscriptionPanel: React.FC<TranscriptionPanelProps> = ({ file }) => {
+  const { downloadConvertedFile } = useAudioConverter();
+
   if (!file) {
     return (
       <div className="flex-1 flex items-center justify-center bg-white">
@@ -65,34 +68,54 @@ const TranscriptionPanel: React.FC<TranscriptionPanelProps> = ({ file }) => {
       <div className="h-full flex flex-col">
         {/* Header */}
         <div className="border-b border-gray-200 p-6">
-          <div className="flex items-start space-x-4">
-            {getFileIcon()}
-            <div className="flex-1 min-w-0">
-              <h1 className="text-xl font-semibold text-gray-900 truncate">
-                {file.name}
-              </h1>
-              <div className="flex flex-wrap items-center gap-4 mt-2">
-                <span className="text-sm text-gray-600">
-                  {formatFileSize(file.size)}
-                </span>
-                <span className="text-sm text-gray-600">
-                  {formatDate(file.uploadedAt)}
-                </span>
-                {file.duration && (
+          <div className="flex items-start justify-between">
+            <div className="flex items-start space-x-4">
+              {getFileIcon()}
+              <div className="flex-1 min-w-0">
+                <h1 className="text-xl font-semibold text-gray-900 truncate">
+                  {file.name}
+                </h1>
+                <div className="flex flex-wrap items-center gap-4 mt-2">
                   <span className="text-sm text-gray-600">
-                    Duração: {file.duration}
+                    {formatFileSize(file.size)}
                   </span>
-                )}
-                {file.language && (
-                  <div className="flex items-center space-x-1">
-                    <Globe className="w-4 h-4 text-gray-400" />
+                  <span className="text-sm text-gray-600">
+                    {formatDate(file.uploadedAt)}
+                  </span>
+                  {file.duration && (
                     <span className="text-sm text-gray-600">
-                      {getLanguageName(file.language)}
+                      Duração: {file.duration}
                     </span>
-                  </div>
-                )}
+                  )}
+                  {file.language && (
+                    <div className="flex items-center space-x-1">
+                      <Globe className="w-4 h-4 text-gray-400" />
+                      <span className="text-sm text-gray-600">
+                        {getLanguageName(file.language)}
+                      </span>
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
+            
+            {/* Download Button */}
+            {file.isConverted && file.convertedPath && (
+              <button 
+                className="flex items-center space-x-2 px-4 py-2 text-sm font-medium text-blue-700 bg-blue-50 border border-blue-200 rounded-lg hover:bg-blue-100 transition-colors"
+                onClick={async () => {
+                  const result = await downloadConvertedFile(file.convertedPath!);
+                  if (!result.canceled && !result.error) {
+                    console.log('Arquivo baixado com sucesso!');
+                  } else if (result.error) {
+                    console.error('Erro ao baixar:', result.error);
+                  }
+                }}
+              >
+                <Download className="w-4 h-4" />
+                <span>Baixar MP3</span>
+              </button>
+            )}
           </div>
         </div>
 

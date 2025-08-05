@@ -1,6 +1,7 @@
 import React, { useCallback, useState } from 'react';
 import { Upload, FileAudio, FileVideo, X } from 'lucide-react';
 import { TranscriptionFile, UploadProgress } from '../types';
+import { useAudioConverter } from '../hooks/useAudioConverter';
 
 interface FileUploadProps {
   onFilesUploaded: (files: TranscriptionFile[]) => void;
@@ -9,6 +10,7 @@ interface FileUploadProps {
 const FileUpload: React.FC<FileUploadProps> = ({ onFilesUploaded }) => {
   const [isDragOver, setIsDragOver] = useState(false);
   const [uploadProgress, setUploadProgress] = useState<UploadProgress[]>([]);
+  const { convertAudioFile, conversionProgress } = useAudioConverter();
 
   const acceptedMimeTypes = [
     'audio/mp3',
@@ -29,7 +31,7 @@ const FileUpload: React.FC<FileUploadProps> = ({ onFilesUploaded }) => {
   const acceptedExtensionsArray = ['mp3','wav','m4a','aac','ogg','mp4','mov','avi','mkv'];
   const acceptedExtensions = '.mp3,.wav,.m4a,.aac,.ogg,.mp4,.mov,.avi,.mkv';
 
-  const simulateTranscription = (fileName: string): string => {
+  const simulateTranscription = (): string => {
     const samples = [
       "Olá, bem-vindos ao nosso podcast sobre tecnologia. Hoje vamos falar sobre inteligência artificial e como ela está transformando o mundo dos negócios.",
       "Esta é uma reunião importante onde discutiremos os próximos passos do projeto. Precisamos alinhar as expectativas e definir os prazos.",
@@ -49,7 +51,13 @@ const FileUpload: React.FC<FileUploadProps> = ({ onFilesUploaded }) => {
     const minutes = Math.floor(Math.random() * 15) + 1; // 1-15 minutes
     const seconds = Math.floor(Math.random() * 60); // 0-59 seconds
     return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+  };  const needsConversion = (file: File): boolean => {
+    const videoExtensions = ['mp4', 'mov', 'avi', 'mkv'];
+    const audioExtensions = ['wav', 'm4a', 'aac', 'ogg'];
+    const extension = file.name.split('.').pop()?.toLowerCase();
+    return [...videoExtensions, ...audioExtensions].includes(extension || '');
   };
+
   const processFiles = async (files: File[]) => {
     const newProgress: UploadProgress[] = files.map(file => ({
       fileId: crypto.randomUUID(),
@@ -78,16 +86,75 @@ const FileUpload: React.FC<FileUploadProps> = ({ onFilesUploaded }) => {
         );
       }
 
-      // Simulate processing
+      let convertedPath: string | undefined;
+      let isConverted = false;      // Check if file needs conversion
+      if (needsConversion(file)) {
+        // Update status to converting
+        setUploadProgress(prev => 
+          prev.map(p => 
+            p.fileId === progressItem.fileId 
+              ? { ...p, status: 'converting', progress: 0 }
+              : p
+          )
+        );
+
+        // Convert file using Electron API
+        if (window.electronAPI) {
+          try {
+            const conversionResult = await convertAudioFile(file, progressItem.fileId);
+            
+            if (conversionResult.success && conversionResult.outputPath) {
+              isConverted = true;
+              convertedPath = conversionResult.outputPath;
+            } else {
+              console.error('Conversion failed:', conversionResult.error);
+              // Continue without conversion
+            }
+          } catch (error) {
+            console.error('Conversion failed:', error);
+            // Continue without conversion
+          }
+        } else {
+          // Fallback: simulate conversion for development
+          await new Promise(resolve => setTimeout(resolve, 2000));
+          
+          // Simulate conversion progress
+          for (let progress = 0; progress <= 100; progress += 20) {
+            setUploadProgress(prev => 
+              prev.map(p => 
+                p.fileId === progressItem.fileId 
+                  ? { ...p, progress }
+                  : p
+              )
+            );
+            await new Promise(resolve => setTimeout(resolve, 200));
+          }
+
+          isConverted = true;
+          convertedPath = `converted_${file.name.replace(/\.[^/.]+$/, "")}.mp3`;
+        }
+      }
+
+      // Simulate transcription processing
       setUploadProgress(prev => 
         prev.map(p => 
           p.fileId === progressItem.fileId 
-            ? { ...p, status: 'processing' }
+            ? { ...p, status: 'processing', progress: 0 }
             : p
         )
       );
 
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      // Simulate transcription progress
+      for (let progress = 0; progress <= 100; progress += 25) {
+        setUploadProgress(prev => 
+          prev.map(p => 
+            p.fileId === progressItem.fileId 
+              ? { ...p, progress }
+              : p
+          )
+        );
+        await new Promise(resolve => setTimeout(resolve, 300));
+      }
 
       // Complete processing
       const transcriptionFile: TranscriptionFile = {
@@ -95,10 +162,13 @@ const FileUpload: React.FC<FileUploadProps> = ({ onFilesUploaded }) => {
         name: file.name,
         size: file.size,
         type: file.type,
-        content: simulateTranscription(file.name),
+        content: simulateTranscription(),
         language: detectLanguage(),
         duration: generateRandomDuration(),
-        uploadedAt: new Date()
+        uploadedAt: new Date(),
+        originalPath: file.name,
+        convertedPath,
+        isConverted
       };
 
       processedFiles.push(transcriptionFile);
@@ -182,23 +252,27 @@ const FileUpload: React.FC<FileUploadProps> = ({ onFilesUploaded }) => {
                     </button>
                   )}
                 </div>
-                <div className="w-full bg-gray-200 rounded-full h-2">
-                  <div
+                <div className="w-full bg-gray-200 rounded-full h-2">                  <div
                     className={`h-2 rounded-full transition-all duration-300 ${
                       item.status === 'completed' 
                         ? 'bg-emerald-500' 
+                        : item.status === 'converting'
+                        ? 'bg-orange-500 animate-pulse'
                         : item.status === 'processing'
                         ? 'bg-blue-500 animate-pulse'
+                        : item.status === 'error'
+                        ? 'bg-red-500'
                         : 'bg-blue-500'
                     }`}
                     style={{ width: `${item.progress}%` }}
                   />
                 </div>
-                <div className="flex justify-between items-center mt-1">
-                  <span className="text-xs text-gray-500">
+                <div className="flex justify-between items-center mt-1">                  <span className="text-xs text-gray-500">
                     {item.status === 'uploading' && 'Enviando...'}
+                    {item.status === 'converting' && 'Convertendo para MP3...'}
                     {item.status === 'processing' && 'Transcrevendo...'}
                     {item.status === 'completed' && 'Concluído!'}
+                    {item.status === 'error' && 'Erro no processamento'}
                   </span>
                   <span className="text-xs text-gray-500">{item.progress}%</span>
                 </div>

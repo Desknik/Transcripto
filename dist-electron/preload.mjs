@@ -17,6 +17,10 @@ electron.contextBridge.exposeInMainWorld("ipcRenderer", {
     const [channel, ...omit] = args;
     return electron.ipcRenderer.invoke(channel, ...omit);
   }
-  // You can expose other APTs you need here.
-  // ...
+});
+electron.contextBridge.exposeInMainWorld("electronAPI", {
+  convertAudio: (filePath) => electron.ipcRenderer.invoke("convert-audio", filePath),
+  saveFileDialog: () => electron.ipcRenderer.invoke("save-file-dialog"),
+  saveFileToDisk: (fileBuffer, fileName) => electron.ipcRenderer.invoke("save-file-to-disk", Buffer.from(fileBuffer), fileName),
+  copyFile: (sourcePath, targetPath) => electron.ipcRenderer.invoke("copy-file", sourcePath, targetPath)
 });

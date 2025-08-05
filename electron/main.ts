@@ -1,10 +1,41 @@
-import { app, BrowserWindow } from 'electron'
-import { createRequire } from 'node:module'
+import { app, BrowserWindow, ipcMain, dialog } from 'electron'
 import { fileURLToPath } from 'node:url'
 import path from 'node:path'
+import fs from 'node:fs'
+import os from 'node:os'
+import ffmpeg from 'fluent-ffmpeg'
+import ffmpegStatic from 'ffmpeg-static'
 
-const require = createRequire(import.meta.url)
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
+
+// Configure FFmpeg path
+if (ffmpegStatic) {
+  ffmpeg.setFfmpegPath(ffmpegStatic)
+}
+
+// Audio conversion service
+async function convertToMp3(inputPath: string, outputDir: string): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const outputFileName = `${path.parse(inputPath).name}_converted.mp3`
+    const outputPath = path.join(outputDir, outputFileName)
+
+    ffmpeg(inputPath)
+      .toFormat('mp3')
+      .audioBitrate(93) // 93k bitrate as requested
+      .on('end', () => {
+        console.log('Conversion finished successfully')
+        resolve(outputPath)
+      })
+      .on('error', (err) => {
+        console.error('Error during conversion:', err)
+        reject(err)
+      })      .on('progress', (progress) => {
+        const percent = progress.percent ? Math.round(progress.percent) : 0;
+        console.log(`Processing: ${percent}% done`);
+      })
+      .save(outputPath)
+  })
+}
 
 // The built directory structure
 //
@@ -62,6 +93,49 @@ app.on('activate', () => {
   // dock icon is clicked and there are no other windows open.
   if (BrowserWindow.getAllWindows().length === 0) {
     createWindow()
+  }
+})
+
+// IPC handlers for file conversion
+ipcMain.handle('convert-audio', async (_, filePath: string) => {
+  try {
+    const tempDir = os.tmpdir()
+    const outputPath = await convertToMp3(filePath, tempDir)
+    return { success: true, outputPath }
+  } catch (error) {
+    console.error('Conversion error:', error)
+    return { success: false, error: error instanceof Error ? error.message : 'Unknown error' }
+  }
+})
+
+ipcMain.handle('save-file-dialog', async () => {
+  const result = await dialog.showSaveDialog(win!, {
+    filters: [{ name: 'MP3 Files', extensions: ['mp3'] }],
+    defaultPath: 'converted_audio.mp3'
+  })
+  return result
+})
+
+ipcMain.handle('save-file-to-disk', async (_, fileBuffer: Buffer, fileName: string) => {
+  try {
+    const tempDir = os.tmpdir()
+    const tempFilePath = path.join(tempDir, fileName)
+    
+    await fs.promises.writeFile(tempFilePath, fileBuffer)
+    return { success: true, filePath: tempFilePath }
+  } catch (error) {
+    console.error('Error saving file to disk:', error)
+    return { success: false, error: error instanceof Error ? error.message : 'Unknown error' }
+  }
+})
+
+ipcMain.handle('copy-file', async (_, sourcePath: string, targetPath: string) => {
+  try {
+    await fs.promises.copyFile(sourcePath, targetPath)
+    return { success: true }
+  } catch (error) {
+    console.error('Error copying file:', error)
+    return { success: false, error: error instanceof Error ? error.message : 'Unknown error' }
   }
 })
 

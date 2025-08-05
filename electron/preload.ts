@@ -18,7 +18,14 @@ contextBridge.exposeInMainWorld('ipcRenderer', {
     const [channel, ...omit] = args
     return ipcRenderer.invoke(channel, ...omit)
   },
+})
 
-  // You can expose other APTs you need here.
-  // ...
+// Expose audio conversion APIs
+contextBridge.exposeInMainWorld('electronAPI', {
+  convertAudio: (filePath: string) => ipcRenderer.invoke('convert-audio', filePath),
+  saveFileDialog: () => ipcRenderer.invoke('save-file-dialog'),
+  saveFileToDisk: (fileBuffer: ArrayBuffer, fileName: string) => 
+    ipcRenderer.invoke('save-file-to-disk', Buffer.from(fileBuffer), fileName),
+  copyFile: (sourcePath: string, targetPath: string) => 
+    ipcRenderer.invoke('copy-file', sourcePath, targetPath),
 })
