@@ -128,50 +128,46 @@ const FileUpload: React.FC<FileUploadProps> = ({ onFilesUploaded }) => {
       let convertedPath: string | undefined;
       let isConverted = false;
       let audioFilePath: string = file.path || file.name; // Caminho real do arquivo
-      // Check if file needs conversion
-      if (needsConversion(file)) {
-        // Update status to converting
-        setUploadProgress(prev => 
-          prev.map(p => 
-            p.fileId === progressItem.fileId 
-              ? { ...p, status: 'converting', progress: 0 }
-              : p
-          )
-        );
+      // Sempre converter para mp3 93k
+      setUploadProgress(prev => 
+        prev.map(p => 
+          p.fileId === progressItem.fileId 
+            ? { ...p, status: 'converting', progress: 0 }
+            : p
+        )
+      );
 
-        // Convert file using Electron API
-        if (window.electronAPI) {
-          try {
-            const conversionResult = await convertAudioFile(file, progressItem.fileId);
-            if (conversionResult.success && conversionResult.outputPath) {
-              isConverted = true;
-              convertedPath = conversionResult.outputPath;
-              audioFilePath = convertedPath; // Usa o caminho convertido real
-            } else {
-              console.error('Conversion failed:', conversionResult.error);
-              // Continue sem conversão
-            }
-          } catch (error) {
-            console.error('Conversion failed:', error);
+      if (window.electronAPI) {
+        try {
+          const conversionResult = await convertAudioFile(file, progressItem.fileId);
+          if (conversionResult.success && conversionResult.outputPath) {
+            isConverted = true;
+            convertedPath = conversionResult.outputPath;
+            audioFilePath = convertedPath; // Usa o caminho convertido real
+          } else {
+            console.error('Conversion failed:', conversionResult.error);
             // Continue sem conversão
           }
-        } else {
-          // Fallback: simula conversão para desenvolvimento
-          await new Promise(resolve => setTimeout(resolve, 2000));
-          // Simula progresso de conversão
-          for (let progress = 0; progress <= 100; progress += 20) {
-            setUploadProgress(prev => 
-              prev.map(p => 
-                p.fileId === progressItem.fileId 
-                  ? { ...p, progress }
-                  : p
-              )
-            );
-            await new Promise(resolve => setTimeout(resolve, 200));
-          }
-          isConverted = true;
-          // NÃO altera audioFilePath, pois arquivo convertido não existe de fato
+        } catch (error) {
+          console.error('Conversion failed:', error);
+          // Continue sem conversão
         }
+      } else {
+        // Fallback: simula conversão para desenvolvimento
+        await new Promise(resolve => setTimeout(resolve, 2000));
+        // Simula progresso de conversão
+        for (let progress = 0; progress <= 100; progress += 20) {
+          setUploadProgress(prev => 
+            prev.map(p => 
+              p.fileId === progressItem.fileId 
+                ? { ...p, progress }
+                : p
+            )
+          );
+          await new Promise(resolve => setTimeout(resolve, 200));
+        }
+        isConverted = true;
+        // NÃO altera audioFilePath, pois arquivo convertido não existe de fato
       }
       // Transcription processing
       setUploadProgress(prev => 
