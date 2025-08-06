@@ -32,4 +32,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // Transcription APIs
   getTranscriptionProviders: () => ipcRenderer.invoke('get-transcription-providers'),
   transcribeAudio: (request: any) => ipcRenderer.invoke('transcribe-audio', request),
+  
+  // Store APIs
+  storeGet: (key: string) => ipcRenderer.invoke('store-get', key),
+  storeSet: (key: string, value: any) => ipcRenderer.invoke('store-set', key, value),
+  storeDelete: (key: string) => ipcRenderer.invoke('store-delete', key),
+  storeClear: () => ipcRenderer.invoke('store-clear'),
 })

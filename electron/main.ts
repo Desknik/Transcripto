@@ -6,10 +6,22 @@ import os from 'node:os'
 import ffmpeg from 'fluent-ffmpeg'
 import ffmpegStatic from 'ffmpeg-static'
 import dotenv from 'dotenv'
+import Store from 'electron-store'
 import { TranscriptionServiceManager } from '../src/services/transcription'
 
 // Load environment variables
 dotenv.config()
+
+// Initialize electron-store
+const store = new Store({
+  name: 'transcripto-data',
+  defaults: {
+    groups: [],
+    selectedFileId: null,
+    selectedGroupId: null,
+    expandedGroups: []
+  }
+})
 
 // Initialize transcription service manager
 const transcriptionManager = new TranscriptionServiceManager()
@@ -164,6 +176,46 @@ ipcMain.handle('transcribe-audio', async (_, request: any) => {
       success: false, 
       error: error instanceof Error ? error.message : 'Unknown error' 
     }
+  }
+})
+
+// Store handlers
+ipcMain.handle('store-get', async (_, key: string) => {
+  try {
+    return { success: true, data: store.get(key) }
+  } catch (error) {
+    console.error('Error getting store data:', error)
+    return { success: false, error: error instanceof Error ? error.message : 'Unknown error' }
+  }
+})
+
+ipcMain.handle('store-set', async (_, key: string, value: any) => {
+  try {
+    store.set(key, value)
+    return { success: true }
+  } catch (error) {
+    console.error('Error setting store data:', error)
+    return { success: false, error: error instanceof Error ? error.message : 'Unknown error' }
+  }
+})
+
+ipcMain.handle('store-delete', async (_, key: string) => {
+  try {
+    store.delete(key)
+    return { success: true }
+  } catch (error) {
+    console.error('Error deleting store data:', error)
+    return { success: false, error: error instanceof Error ? error.message : 'Unknown error' }
+  }
+})
+
+ipcMain.handle('store-clear', async () => {
+  try {
+    store.clear()
+    return { success: true }
+  } catch (error) {
+    console.error('Error clearing store:', error)
+    return { success: false, error: error instanceof Error ? error.message : 'Unknown error' }
   }
 })
 

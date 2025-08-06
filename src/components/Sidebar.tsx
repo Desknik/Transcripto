@@ -16,6 +16,7 @@ interface SidebarProps {
   onFileSelect: (fileId: string | null) => void;
   onNewTranscription: (groupId: string) => void;
   onNewTranscriptionGeneral: () => void;
+  onUpdateGroupName: (groupId: string, newName: string) => void;
 }
 
 const Sidebar: React.FC<SidebarProps> = ({
@@ -25,6 +26,7 @@ const Sidebar: React.FC<SidebarProps> = ({
   onFileSelect,
   onNewTranscription,
   onNewTranscriptionGeneral,
+  onUpdateGroupName,
 }) => {
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
 

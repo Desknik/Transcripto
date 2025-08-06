@@ -25,5 +25,10 @@ electron.contextBridge.exposeInMainWorld("electronAPI", {
   copyFile: (sourcePath, targetPath) => electron.ipcRenderer.invoke("copy-file", sourcePath, targetPath),
   // Transcription APIs
   getTranscriptionProviders: () => electron.ipcRenderer.invoke("get-transcription-providers"),
-  transcribeAudio: (request) => electron.ipcRenderer.invoke("transcribe-audio", request)
+  transcribeAudio: (request) => electron.ipcRenderer.invoke("transcribe-audio", request),
+  // Store APIs
+  storeGet: (key) => electron.ipcRenderer.invoke("store-get", key),
+  storeSet: (key, value) => electron.ipcRenderer.invoke("store-set", key, value),
+  storeDelete: (key) => electron.ipcRenderer.invoke("store-delete", key),
+  storeClear: () => electron.ipcRenderer.invoke("store-clear")
 });

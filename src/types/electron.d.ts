@@ -26,6 +26,25 @@ export interface ElectronAPI {
     error?: string;
   }>;
   transcribeAudio: (request: TranscriptionRequest) => Promise<TranscriptionResponse>;
+  
+  // Store APIs
+  storeGet: (key: string) => Promise<{
+    success: boolean;
+    data?: any;
+    error?: string;
+  }>;
+  storeSet: (key: string, value: any) => Promise<{
+    success: boolean;
+    error?: string;
+  }>;
+  storeDelete: (key: string) => Promise<{
+    success: boolean;
+    error?: string;
+  }>;
+  storeClear: () => Promise<{
+    success: boolean;
+    error?: string;
+  }>;
 }
 
 declare global {

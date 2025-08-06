@@ -1,23 +1,32 @@
-import { useState } from 'react';
 import { Mic } from 'lucide-react';
 import FileUpload from './components/FileUpload';
 import Sidebar from './components/Sidebar';
 import TranscriptionPanel from './components/TranscriptionPanel';
+import EditableGroupHeader from './components/EditableGroupHeader';
 import { TranscriptionFile, TranscriptionGroup } from './types';
+import { useElectronStore } from './hooks/useElectronStore';
 
 function App() {
-  const [groups, setGroups] = useState<TranscriptionGroup[]>([]);
-  const [selectedFileId, setSelectedFileId] = useState<string | null>(null);
-  const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null);
+  const {
+    isLoading,
+    groups,
+    selectedFileId,
+    selectedGroupId,
+    saveGroups,
+    saveSelectedFileId,
+    saveSelectedGroupId,
+    updateGroupName
+  } = useElectronStore();
 
-  const handleFilesUploaded = (files: TranscriptionFile[], groupId?: string) => {
+  const handleFilesUploaded = async (files: TranscriptionFile[], groupId?: string) => {
     if (groupId) {
       // Adicionar arquivos a um grupo existente
-      setGroups(prev => prev.map(group => 
+      const updatedGroups = groups.map(group => 
         group.id === groupId 
           ? { ...group, files: [...group.files, ...files] }
           : group
-      ));
+      );
+      await saveGroups(updatedGroups);
     } else {
       // Criar novo grupo (sempre agrupa, mesmo para um arquivo)
       const newGroup: TranscriptionGroup = {
@@ -27,24 +36,24 @@ function App() {
         createdAt: new Date()
       };
 
-      setGroups(prev => [newGroup, ...prev]);
-      setSelectedGroupId(newGroup.id);
+      await saveGroups([newGroup, ...groups]);
+      await saveSelectedGroupId(newGroup.id);
     }
     
     // Auto-select first file
     if (files.length > 0) {
-      setSelectedFileId(files[0].id);
+      await saveSelectedFileId(files[0].id);
     }
   };
 
-  const handleFileSelect = (fileId: string | null) => {
-    setSelectedFileId(fileId);
+  const handleFileSelect = async (fileId: string | null) => {
+    await saveSelectedFileId(fileId);
     
     // Find and set the group that contains this file
     if (fileId) {
       const group = groups.find(g => g.files.some(f => f.id === fileId));
       if (group) {
-        setSelectedGroupId(group.id);
+        await saveSelectedGroupId(group.id);
       }
     }
   };
@@ -67,14 +76,15 @@ function App() {
             selectedFileId={selectedFileId}
             selectedGroupId={selectedGroupId}
             onFileSelect={handleFileSelect}
-            onNewTranscription={(groupId: string) => {
-              setSelectedGroupId(groupId);
-              setSelectedFileId(null);
+            onNewTranscription={async (groupId: string) => {
+              await saveSelectedGroupId(groupId);
+              await saveSelectedFileId(null);
             }}
-            onNewTranscriptionGeneral={() => {
-              setSelectedGroupId(null);
-              setSelectedFileId(null);
+            onNewTranscriptionGeneral={async () => {
+              await saveSelectedGroupId(null);
+              await saveSelectedFileId(null);
             }}
+            onUpdateGroupName={updateGroupName}
           />
         )}
 
@@ -85,25 +95,10 @@ function App() {
             <>
               {/* Show group header if we're adding to an existing group */}
               {selectedGroupId && selectedGroup && (
-                <header className="bg-white border-b border-gray-200 px-6 py-4">
-                  <div className="flex items-center space-x-3">
-                    <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center">
-                      <Mic className="w-5 h-5 text-white" />
-                    </div>
-                    <div>
-                      <h1 className="text-xl font-bold text-gray-900">{selectedGroup.name}</h1>
-                      <p className="text-sm text-gray-600">
-                        {selectedGroup.files.length} arquivo(s) • Criado em {new Intl.DateTimeFormat('pt-BR', {
-                          day: '2-digit',
-                          month: '2-digit',
-                          year: 'numeric',
-                          hour: '2-digit',
-                          minute: '2-digit'
-                        }).format(selectedGroup.createdAt)}
-                      </p>
-                    </div>
-                  </div>
-                </header>
+                <EditableGroupHeader 
+                  group={selectedGroup}
+                  onUpdateName={updateGroupName}
+                />
               )}
               
               <div className="flex-1 flex items-center justify-center p-8">
@@ -130,25 +125,10 @@ function App() {
             <>
               {/* Show group header when a file is selected */}
               {selectedGroup && (
-                <header className="bg-white border-b border-gray-200 px-6 py-4">
-                  <div className="flex items-center space-x-3">
-                    <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center">
-                      <Mic className="w-5 h-5 text-white" />
-                    </div>
-                    <div>
-                      <h1 className="text-xl font-bold text-gray-900">{selectedGroup.name}</h1>
-                      <p className="text-sm text-gray-600">
-                        {selectedGroup.files.length} arquivo(s) • Criado em {new Intl.DateTimeFormat('pt-BR', {
-                          day: '2-digit',
-                          month: '2-digit',
-                          year: 'numeric',
-                          hour: '2-digit',
-                          minute: '2-digit'
-                        }).format(selectedGroup.createdAt)}
-                      </p>
-                    </div>
-                  </div>
-                </header>
+                <EditableGroupHeader 
+                  group={selectedGroup}
+                  onUpdateName={updateGroupName}
+                />
               )}
               
               <TranscriptionPanel file={selectedFile} group={selectedGroup} showGroupHeader={false} />
