@@ -3,19 +3,22 @@ import FileUpload from './components/FileUpload';
 import Sidebar from './components/Sidebar';
 import TranscriptionPanel from './components/TranscriptionPanel';
 import EditableGroupHeader from './components/EditableGroupHeader';
+import GroupHeader from './components/GroupHeader';
 import { TranscriptionFile, TranscriptionGroup } from './types';
 import { useElectronStore } from './hooks/useElectronStore';
 
 function App() {
   const {
-    isLoading,
     groups,
     selectedFileId,
     selectedGroupId,
     saveGroups,
     saveSelectedFileId,
     saveSelectedGroupId,
-    updateGroupName
+    updateGroupName,
+    reorderGroups,
+    reorderFilesInGroup,
+    moveFileBetweenGroups
   } = useElectronStore();
 
   const handleFilesUploaded = async (files: TranscriptionFile[], groupId?: string) => {
@@ -85,6 +88,9 @@ function App() {
               await saveSelectedFileId(null);
             }}
             onUpdateGroupName={updateGroupName}
+            onReorderGroups={reorderGroups}
+            onReorderFilesInGroup={reorderFilesInGroup}
+            onMoveFileBetweenGroups={moveFileBetweenGroups}
           />
         )}
 
@@ -125,7 +131,7 @@ function App() {
             <>
               {/* Show group header when a file is selected */}
               {selectedGroup && (
-                <EditableGroupHeader 
+                <GroupHeader 
                   group={selectedGroup}
                   onUpdateName={updateGroupName}
                 />

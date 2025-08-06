@@ -112,12 +112,60 @@ export const useElectronStore = () => {
       }
     }
   }, []);
-
   // Update group name
   const updateGroupName = useCallback(async (groupId: string, newName: string) => {
     const updatedGroups = groups.map(group => 
       group.id === groupId ? { ...group, name: newName } : group
     );
+    await saveGroups(updatedGroups);
+  }, [groups, saveGroups]);
+
+  // Reorder groups
+  const reorderGroups = useCallback(async (oldIndex: number, newIndex: number) => {
+    const reorderedGroups = [...groups];
+    const [removed] = reorderedGroups.splice(oldIndex, 1);
+    reorderedGroups.splice(newIndex, 0, removed);
+    await saveGroups(reorderedGroups);
+  }, [groups, saveGroups]);
+
+  // Reorder files within a group
+  const reorderFilesInGroup = useCallback(async (groupId: string, oldIndex: number, newIndex: number) => {
+    const updatedGroups = groups.map(group => {
+      if (group.id === groupId) {
+        const reorderedFiles = [...group.files];
+        const [removed] = reorderedFiles.splice(oldIndex, 1);
+        reorderedFiles.splice(newIndex, 0, removed);
+        return { ...group, files: reorderedFiles };
+      }
+      return group;
+    });
+    await saveGroups(updatedGroups);
+  }, [groups, saveGroups]);
+
+  // Move file between groups
+  const moveFileBetweenGroups = useCallback(async (
+    fileId: string, 
+    sourceGroupId: string, 
+    targetGroupId: string, 
+    targetIndex: number
+  ) => {
+    const sourceGroup = groups.find(g => g.id === sourceGroupId);
+    const targetGroup = groups.find(g => g.id === targetGroupId);
+    const file = sourceGroup?.files.find(f => f.id === fileId);
+
+    if (!sourceGroup || !targetGroup || !file) return;
+
+    const updatedGroups = groups.map(group => {
+      if (group.id === sourceGroupId) {
+        return { ...group, files: group.files.filter(f => f.id !== fileId) };
+      } else if (group.id === targetGroupId) {
+        const newFiles = [...group.files];
+        newFiles.splice(targetIndex, 0, file);
+        return { ...group, files: newFiles };
+      }
+      return group;
+    });
+
     await saveGroups(updatedGroups);
   }, [groups, saveGroups]);
 
@@ -135,7 +183,6 @@ export const useElectronStore = () => {
       }
     }
   }, []);
-
   return {
     isLoading,
     groups,
@@ -147,6 +194,9 @@ export const useElectronStore = () => {
     saveSelectedGroupId,
     saveExpandedGroups,
     updateGroupName,
+    reorderGroups,
+    reorderFilesInGroup,
+    moveFileBetweenGroups,
     clearStore
   };
 };
