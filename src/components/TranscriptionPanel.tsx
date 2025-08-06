@@ -1,5 +1,5 @@
-import React from 'react';
-import { FileAudio, FileVideo, Globe, Download, Mic } from 'lucide-react';
+import React, { useState } from 'react';
+import { FileAudio, FileVideo, Globe, Download, Mic, Copy, Check } from 'lucide-react';
 import { TranscriptionFile, TranscriptionGroup } from '../types';
 import { useAudioConverter } from '../hooks/useAudioConverter';
 
@@ -11,6 +11,17 @@ interface TranscriptionPanelProps {
 
 const TranscriptionPanel: React.FC<TranscriptionPanelProps> = ({ file, group, showGroupHeader = true }) => {
   const { downloadConvertedFile } = useAudioConverter();
+  const [copied, setCopied] = useState(false);
+
+  const copyToClipboard = async (text: string) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch (err) {
+      console.error('Erro ao copiar para área de transferência:', err);
+    }
+  };
 
   if (!file) {
     return (
@@ -180,9 +191,31 @@ const TranscriptionPanel: React.FC<TranscriptionPanelProps> = ({ file, group, sh
         {/* Content */}
         <div className="flex-1 overflow-y-auto p-6">
           <div className="max-w-4xl">
-            <h2 className="text-lg font-medium text-gray-900 mb-4">
-              Transcrição
-            </h2>
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-medium text-gray-900">
+                Transcrição
+              </h2>
+              <button
+                onClick={() => copyToClipboard(file.content)}
+                className={`flex items-center space-x-2 px-3 py-2 text-sm font-medium rounded-lg transition-colors ${
+                  copied 
+                    ? 'text-green-700 bg-green-50 border border-green-200' 
+                    : 'text-gray-700 bg-gray-50 border border-gray-200 hover:bg-gray-100'
+                }`}
+              >
+                {copied ? (
+                  <>
+                    <Check className="w-4 h-4" />
+                    <span>Copiado!</span>
+                  </>
+                ) : (
+                  <>
+                    <Copy className="w-4 h-4" />
+                    <span>Copiar</span>
+                  </>
+                )}
+              </button>
+            </div>
             <div className="bg-gray-50 rounded-lg p-6 border border-gray-200">
               <div className="prose prose-gray max-w-none">
                 <p className="text-gray-800 leading-relaxed whitespace-pre-wrap">

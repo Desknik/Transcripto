@@ -1,5 +1,5 @@
-import React from 'react';
-import { Calendar, FileText, Folder } from 'lucide-react';
+import React, { useState } from 'react';
+import { Calendar, FileText, Folder, Copy, Check } from 'lucide-react';
 import { TranscriptionGroup } from '../types';
 import EditableGroupHeader from './EditableGroupHeader';
 
@@ -9,6 +9,22 @@ interface GroupHeaderProps {
 }
 
 const GroupHeader: React.FC<GroupHeaderProps> = ({ group, onUpdateName }) => {
+  const [copiedAll, setCopiedAll] = useState(false);
+
+  const copyAllTranscriptions = async () => {
+    try {
+      // Ordena os arquivos pela ordem que aparecem no grupo e concatena as transcrições
+      const allTranscriptions = group.files
+        .map((file, index) => `=== Transcrição ${index + 1}: ${file.name} ===\n\n${file.content}`)
+        .join('\n\n---\n\n');
+      
+      await navigator.clipboard.writeText(allTranscriptions);
+      setCopiedAll(true);
+      setTimeout(() => setCopiedAll(false), 2000);
+    } catch (err) {
+      console.error('Erro ao copiar todas as transcrições:', err);
+    }
+  };
   const formatDate = (date: Date) => {
     return date.toLocaleDateString('pt-BR', {
       day: '2-digit',
@@ -23,7 +39,6 @@ const GroupHeader: React.FC<GroupHeaderProps> = ({ group, onUpdateName }) => {
       minute: '2-digit'
     });
   };
-
   return (
     <div className="bg-white border-b border-gray-200 p-6">
       <div className="flex items-center justify-between">
@@ -54,6 +69,28 @@ const GroupHeader: React.FC<GroupHeaderProps> = ({ group, onUpdateName }) => {
             </div>
           </div>
         </div>
+
+        {/* Botão Copiar Todas as Transcrições */}
+        <button
+          onClick={copyAllTranscriptions}
+          className={`flex items-center space-x-2 px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
+            copiedAll 
+              ? 'text-green-700 bg-green-50 border border-green-200' 
+              : 'text-gray-700 bg-gray-50 border border-gray-200 hover:bg-gray-100'
+          }`}
+        >
+          {copiedAll ? (
+            <>
+              <Check className="w-4 h-4" />
+              <span>Copiado!</span>
+            </>
+          ) : (
+            <>
+              <Copy className="w-4 h-4" />
+              <span>Copiar Todas</span>
+            </>
+          )}
+        </button>
       </div>
     </div>
   );
