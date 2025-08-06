@@ -5,7 +5,7 @@ import { useAudioConverter } from '../hooks/useAudioConverter';
 import TranscriptionProviderSelector from './TranscriptionProviderSelector';
 
 interface FileUploadProps {
-  onFilesUploaded: (files: TranscriptionFile[]) => void;
+  onFilesUploaded: (files: TranscriptionFile[], groupId?: string) => void;
 }
 
 const FileUpload: React.FC<FileUploadProps> = ({ onFilesUploaded }) => {

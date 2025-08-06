@@ -1,28 +1,55 @@
 import React from 'react';
-import { FileAudio, FileVideo, Globe, Download } from 'lucide-react';
-import { TranscriptionFile } from '../types';
+import { FileAudio, FileVideo, Globe, Download, Mic } from 'lucide-react';
+import { TranscriptionFile, TranscriptionGroup } from '../types';
 import { useAudioConverter } from '../hooks/useAudioConverter';
 
 interface TranscriptionPanelProps {
   file: TranscriptionFile | null;
+  group: TranscriptionGroup | null;
+  showGroupHeader?: boolean;
 }
 
-const TranscriptionPanel: React.FC<TranscriptionPanelProps> = ({ file }) => {
+const TranscriptionPanel: React.FC<TranscriptionPanelProps> = ({ file, group, showGroupHeader = true }) => {
   const { downloadConvertedFile } = useAudioConverter();
 
   if (!file) {
     return (
-      <div className="flex-1 flex items-center justify-center bg-white">
-        <div className="text-center max-w-md">
-          <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
-            <FileAudio className="w-8 h-8 text-gray-400" />
+      <div className="flex-1 flex flex-col bg-white">
+        {/* Header */}
+        {group && showGroupHeader && (
+          <header className="bg-white border-b border-gray-200 px-6 py-4">
+            <div className="flex items-center space-x-3">
+              <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center">
+                <Mic className="w-5 h-5 text-white" />
+              </div>
+              <div>
+                <h1 className="text-xl font-bold text-gray-900">{group.name}</h1>
+                <p className="text-sm text-gray-600">
+                  {group.files.length} arquivo(s) • Criado em {new Intl.DateTimeFormat('pt-BR', {
+                    day: '2-digit',
+                    month: '2-digit',
+                    year: 'numeric',
+                    hour: '2-digit',
+                    minute: '2-digit'
+                  }).format(group.createdAt)}
+                </p>
+              </div>
+            </div>
+          </header>
+        )}
+        
+        <div className="flex-1 flex items-center justify-center">
+          <div className="text-center max-w-md">
+            <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+              <FileAudio className="w-8 h-8 text-gray-400" />
+            </div>
+            <h3 className="text-xl font-semibold text-gray-900 mb-2">
+              Nenhuma transcrição selecionada
+            </h3>
+            <p className="text-gray-600">
+              Selecione uma transcrição da barra lateral para visualizar o conteúdo.
+            </p>
           </div>
-          <h3 className="text-xl font-semibold text-gray-900 mb-2">
-            Nenhuma transcrição selecionada
-          </h3>
-          <p className="text-gray-600">
-            Selecione uma transcrição da barra lateral para visualizar o conteúdo.
-          </p>
         </div>
       </div>
     );
@@ -66,15 +93,38 @@ const TranscriptionPanel: React.FC<TranscriptionPanelProps> = ({ file }) => {
   return (
     <div className="flex-1 bg-white overflow-hidden">
       <div className="h-full flex flex-col">
-        {/* Header */}
+        {/* Group Header */}
+        {group && showGroupHeader && (
+          <header className="bg-white border-b border-gray-200 px-6 py-4">
+            <div className="flex items-center space-x-3">
+              <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center">
+                <Mic className="w-5 h-5 text-white" />
+              </div>
+              <div>
+                <h1 className="text-xl font-bold text-gray-900">{group.name}</h1>
+                <p className="text-sm text-gray-600">
+                  {group.files.length} arquivo(s) • Criado em {new Intl.DateTimeFormat('pt-BR', {
+                    day: '2-digit',
+                    month: '2-digit',
+                    year: 'numeric',
+                    hour: '2-digit',
+                    minute: '2-digit'
+                  }).format(group.createdAt)}
+                </p>
+              </div>
+            </div>
+          </header>
+        )}
+        
+        {/* File Header */}
         <div className="border-b border-gray-200 p-6">
           <div className="flex items-start justify-between">
             <div className="flex items-start space-x-4">
               {getFileIcon()}
               <div className="flex-1 min-w-0">
-                <h1 className="text-xl font-semibold text-gray-900 truncate">
+                <h2 className="text-xl font-semibold text-gray-900 truncate">
                   {file.name}
-                </h1>
+                </h2>
                 <div className="flex flex-wrap items-center gap-4 mt-2">
                   <span className="text-sm text-gray-600">
                     {formatFileSize(file.size)}

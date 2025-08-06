@@ -5,21 +5,35 @@ import {
   FileAudio,
   FileVideo,
   Calendar,
+  Plus,
 } from "lucide-react";
 import { TranscriptionGroup, TranscriptionFile } from "../types";
 
 interface SidebarProps {
   groups: TranscriptionGroup[];
   selectedFileId: string | null;
+  selectedGroupId: string | null;
   onFileSelect: (fileId: string | null) => void;
+  onNewTranscription: (groupId: string) => void;
+  onNewTranscriptionGeneral: () => void;
 }
 
 const Sidebar: React.FC<SidebarProps> = ({
   groups,
   selectedFileId,
+  selectedGroupId,
   onFileSelect,
+  onNewTranscription,
+  onNewTranscriptionGeneral,
 }) => {
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
+
+  // Auto-expand selected group
+  React.useEffect(() => {
+    if (selectedGroupId && !expandedGroups.has(selectedGroupId)) {
+      setExpandedGroups(prev => new Set([...prev, selectedGroupId]));
+    }
+  }, [selectedGroupId, expandedGroups]);
 
   const toggleGroup = (groupId: string) => {
     setExpandedGroups((prev) => {
@@ -66,102 +80,85 @@ const Sidebar: React.FC<SidebarProps> = ({
         <p className="text-sm text-gray-600 mt-1">
           {groups.reduce((acc, group) => acc + group.files.length, 0)}{" "}
           arquivo(s)
-        </p>
-        <button
-          onClick={() => onFileSelect(null)}
-          className="mt-3 w-full bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium transition-colors text-sm"
+        </p>        <button
+          onClick={() => onNewTranscriptionGeneral()}
+          className="mt-3 w-full bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white px-4 py-2.5 rounded-lg font-medium transition-all duration-200 text-sm shadow-sm hover:shadow-md flex items-center justify-center space-x-2 group"
         >
-          Nova Transcrição
+          <div className="w-4 h-4 bg-white/20 rounded-full flex items-center justify-center group-hover:bg-white/30 transition-colors">
+            <Plus className="w-2.5 h-2.5" />
+          </div>
+          <span>Nova Transcrição</span>
         </button>
       </div>
 
-      <div className="p-4">
-        <div className="space-y-3">
+      <div className="p-4">        <div className="space-y-3">
           {groups.map((group) => (
             <div
               key={group.id}
               className="bg-white rounded-lg border border-gray-200 overflow-hidden"
             >
-              {group.files.length === 1 ? (
-                // Single file - direct item
-                <button
-                  onClick={() => onFileSelect(group.files[0].id)}
-                  className={`w-full p-3 text-left hover:bg-gray-50 transition-colors ${
-                    selectedFileId === group.files[0].id
-                      ? "bg-blue-50 border-l-4 border-l-blue-500"
-                      : ""
-                  }`}
-                >
-                  <div className="flex items-start space-x-3">
-                    {getFileIcon(group.files[0])}
-                    <div className="flex-1 min-w-0">
-                      <h4 className="font-medium text-gray-900 text-sm leading-tight">
-                        {getFileTitle(group.files[0])}
-                      </h4>
-                      <div className="flex items-center space-x-2 mt-1">
-                        <span className="text-xs text-gray-500">
-                          {formatDate(group.files[0].uploadedAt)}
-                        </span>
-                      </div>
-                    </div>
+              {/* Always show group header */}              <button
+                onClick={() => toggleGroup(group.id)}
+                className={`w-full p-3 flex items-center justify-between hover:bg-gray-50 transition-colors ${
+                  selectedGroupId === group.id ? "bg-blue-50 border-l-4 border-l-blue-500" : ""
+                }`}
+              >
+                <div className="flex items-center space-x-3">
+                  <Calendar className="w-4 h-4 text-gray-500" />
+                  <div className="text-left">
+                    <h4 className="font-medium text-gray-900 text-sm">
+                      {group.name}
+                    </h4>
+                    <p className="text-xs text-gray-500">
+                      {group.files.length} arquivo(s) •{" "}
+                      {formatDate(group.createdAt)}
+                    </p>
                   </div>
-                </button>
-              ) : (
-                // Multiple files - grouped
-                <>
+                </div>
+                {expandedGroups.has(group.id) ? (
+                  <ChevronDown className="w-4 h-4 text-gray-400" />
+                ) : (
+                  <ChevronRight className="w-4 h-4 text-gray-400" />
+                )}
+              </button>              {expandedGroups.has(group.id) && (
+                <div className="border-t border-gray-100 p-3">
+                  {/* Nova Transcrição Button */}
                   <button
-                    onClick={() => toggleGroup(group.id)}
-                    className="w-full p-3 flex items-center justify-between hover:bg-gray-50 transition-colors"
+                    onClick={() => onNewTranscription(group.id)}
+                    className="w-full p-3 bg-blue-50 hover:bg-blue-100 border border-blue-200 hover:border-blue-300 rounded-lg transition-all duration-200 flex items-center space-x-3 text-blue-600 group/button mb-3"
                   >
-                    <div className="flex items-center space-x-3">
-                      <Calendar className="w-4 h-4 text-gray-500" />
-                      <div className="text-left">
-                        <h4 className="font-medium text-gray-900 text-sm">
-                          {group.name}
-                        </h4>
-                        <p className="text-xs text-gray-500">
-                          {group.files.length} arquivo(s) •{" "}
-                          {formatDate(group.createdAt)}
-                        </p>
-                      </div>
+                    <div className="w-6 h-6 bg-blue-200 rounded-full flex items-center justify-center group-hover/button:bg-blue-300 transition-colors">
+                      <Plus className="w-3.5 h-3.5" />
                     </div>
-                    {expandedGroups.has(group.id) ? (
-                      <ChevronDown className="w-4 h-4 text-gray-400" />
-                    ) : (
-                      <ChevronRight className="w-4 h-4 text-gray-400" />
-                    )}
-                  </button>
-
-                  {expandedGroups.has(group.id) && (
-                    <div className="border-t border-gray-100">
-                      {group.files.map((file) => (
-                        <button
-                          key={file.id}
-                          onClick={() => onFileSelect(file.id)}
-                          className={`w-full p-3 pl-10 text-left hover:bg-gray-50 transition-colors border-l-2 ${
-                            selectedFileId === file.id
-                              ? "bg-blue-50 border-l-blue-500"
-                              : "border-l-transparent"
-                          }`}
-                        >
-                          <div className="flex items-start space-x-3">
-                            {getFileIcon(file)}
-                            <div className="flex-1 min-w-0">
-                              <h5 className="font-medium text-gray-900 text-sm leading-tight">
-                                {getFileTitle(file)}
-                              </h5>
-                              <div className="flex items-center space-x-2 mt-1">
-                                <span className="text-xs text-gray-500">
-                                  {formatDate(file.uploadedAt)}
-                                </span>
-                              </div>
-                            </div>
+                    <span className="font-medium text-sm group-hover/button:text-blue-700 transition-colors">Nova Transcrição</span>
+                  </button>                  
+                  {/* Files */}
+                  {group.files.map((file) => (
+                    <button
+                      key={file.id}
+                      onClick={() => onFileSelect(file.id)}
+                      className={`w-full p-3 pl-6 text-left hover:bg-gray-50 transition-colors border-l-2 ${
+                        selectedFileId === file.id
+                          ? "bg-blue-50 border-l-blue-500"
+                          : "border-l-transparent hover:border-l-gray-200"
+                      }`}
+                    >
+                      <div className="flex items-start space-x-3">
+                        {getFileIcon(file)}
+                        <div className="flex-1 min-w-0">
+                          <h5 className="font-medium text-gray-900 text-sm leading-tight">
+                            {getFileTitle(file)}
+                          </h5>
+                          <div className="flex items-center space-x-2 mt-1">
+                            <span className="text-xs text-gray-500">
+                              {formatDate(file.uploadedAt)}
+                            </span>
                           </div>
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </>
+                        </div>
+                      </div>
+                    </button>
+                  ))}
+                </div>
               )}
             </div>
           ))}
