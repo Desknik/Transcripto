@@ -2,7 +2,6 @@ import { Mic } from 'lucide-react';
 import FileUpload from './components/FileUpload';
 import Sidebar from './components/Sidebar';
 import TranscriptionPanel from './components/TranscriptionPanel';
-import EditableGroupHeader from './components/EditableGroupHeader';
 import GroupHeader from './components/GroupHeader';
 import { TranscriptionFile, TranscriptionGroup } from './types';
 import { useElectronStore } from './hooks/useElectronStore';
@@ -101,7 +100,7 @@ function App() {
             <>
               {/* Show group header if we're adding to an existing group */}
               {selectedGroupId && selectedGroup && (
-                <EditableGroupHeader 
+                <GroupHeader 
                   group={selectedGroup}
                   onUpdateName={updateGroupName}
                 />
