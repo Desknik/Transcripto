@@ -131,6 +131,33 @@ export const useElectronStore = () => {
     await saveGroups(updatedGroups);
   }, [groups, saveGroups]);
 
+  // Delete group
+  const deleteGroup = useCallback(async (groupId: string) => {
+    const updatedGroups = groups.filter(group => group.id !== groupId);
+    await saveGroups(updatedGroups);
+    
+    // Clear selections if the deleted group was selected
+    if (selectedGroupId === groupId) {
+      await saveSelectedGroupId(null);
+      await saveSelectedFileId(null);
+    }
+  }, [groups, saveGroups, selectedGroupId, saveSelectedGroupId, saveSelectedFileId]);
+
+  // Delete file
+  const deleteFile = useCallback(async (fileId: string) => {
+    const updatedGroups = groups.map(group => ({
+      ...group,
+      files: group.files.filter(file => file.id !== fileId)
+    })).filter(group => group.files.length > 0); // Remove empty groups
+    
+    await saveGroups(updatedGroups);
+    
+    // Clear file selection if the deleted file was selected
+    if (selectedFileId === fileId) {
+      await saveSelectedFileId(null);
+    }
+  }, [groups, saveGroups, selectedFileId, saveSelectedFileId]);
+
   // Reorder groups
   const reorderGroups = useCallback(async (oldIndex: number, newIndex: number) => {
     const reorderedGroups = [...groups];
@@ -209,6 +236,8 @@ export const useElectronStore = () => {
     reorderGroups,
     reorderFilesInGroup,
     moveFileBetweenGroups,
-    clearStore
+    clearStore,
+    deleteGroup,
+    deleteFile
   };
 };

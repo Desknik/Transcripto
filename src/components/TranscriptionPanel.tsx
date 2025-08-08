@@ -1,19 +1,22 @@
 import React, { useState } from 'react';
-import { FileAudio, FileVideo, Globe, Download, Mic, Copy, Check } from 'lucide-react';
+import { FileAudio, FileVideo, Globe, Download, Mic, Copy, Check, Trash2 } from 'lucide-react';
 import { TranscriptionFile, TranscriptionGroup } from '../types';
 import { useAudioConverter } from '../hooks/useAudioConverter';
 import EditableFileName from './EditableFileName';
+import ConfirmationModal from './ConfirmationModal';
 
 interface TranscriptionPanelProps {
   file: TranscriptionFile | null;
   group: TranscriptionGroup | null;
   showGroupHeader?: boolean;
   onUpdateFileName?: (fileId: string, newName: string) => void;
+  onDeleteFile?: (fileId: string) => void;
 }
 
-const TranscriptionPanel: React.FC<TranscriptionPanelProps> = ({ file, group, showGroupHeader = true, onUpdateFileName }) => {
+const TranscriptionPanel: React.FC<TranscriptionPanelProps> = ({ file, group, showGroupHeader = true, onUpdateFileName, onDeleteFile }) => {
   const { downloadConvertedFile } = useAudioConverter();
   const [copied, setCopied] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
 
   const copyToClipboard = async (text: string) => {
     try {
@@ -174,25 +177,38 @@ const TranscriptionPanel: React.FC<TranscriptionPanelProps> = ({ file, group, sh
                   )}
                 </div>
               </div>
+            </div>            
+            {/* Download and Delete Buttons */}
+            <div className="flex items-center space-x-2">
+              {file.isConverted && file.convertedPath && (
+                <button 
+                  className="flex items-center space-x-2 px-4 py-2 text-sm font-medium text-blue-700 bg-blue-50 border border-blue-200 rounded-lg hover:bg-blue-100 transition-colors"
+                  onClick={async () => {
+                    const result = await downloadConvertedFile(file.convertedPath!);
+                    if (!result.canceled && !result.error) {
+                      console.log('Arquivo baixado com sucesso!');
+                    } else if (result.error) {
+                      console.error('Erro ao baixar:', result.error);
+                    }
+                  }}
+                >
+                  <Download className="w-4 h-4" />
+                  <span>Baixar MP3</span>
+                </button>
+              )}
+
+              {/* Botão Excluir Arquivo */}
+              {onDeleteFile && (
+                <button
+                  onClick={() => setShowDeleteModal(true)}
+                  className="flex items-center space-x-2 px-4 py-2 text-sm font-medium text-red-700 bg-red-50 border border-red-200 rounded-lg hover:bg-red-100 transition-colors"
+                  title="Excluir transcrição"
+                >
+                  <Trash2 className="w-4 h-4" />
+                  <span>Excluir</span>
+                </button>
+              )}
             </div>
-            
-            {/* Download Button */}
-            {file.isConverted && file.convertedPath && (
-              <button 
-                className="flex items-center space-x-2 px-4 py-2 text-sm font-medium text-blue-700 bg-blue-50 border border-blue-200 rounded-lg hover:bg-blue-100 transition-colors"
-                onClick={async () => {
-                  const result = await downloadConvertedFile(file.convertedPath!);
-                  if (!result.canceled && !result.error) {
-                    console.log('Arquivo baixado com sucesso!');
-                  } else if (result.error) {
-                    console.error('Erro ao baixar:', result.error);
-                  }
-                }}
-              >
-                <Download className="w-4 h-4" />
-                <span>Baixar MP3</span>
-              </button>
-            )}
           </div>
         </div>
 
@@ -252,10 +268,21 @@ const TranscriptionPanel: React.FC<TranscriptionPanelProps> = ({ file, group, sh
                 </div>
                 <div className="text-sm text-purple-600 font-medium">Min. leitura</div>
               </div>
-            </div>
-          </div>
+            </div>          </div>
         </div>
       </div>
+
+      {/* Modal de Confirmação */}
+      <ConfirmationModal
+        isOpen={showDeleteModal}
+        onClose={() => setShowDeleteModal(false)}
+        onConfirm={() => onDeleteFile && onDeleteFile(file.id)}
+        title="Excluir Transcrição"
+        message={`Tem certeza que deseja excluir a transcrição "${file.name}"? Esta ação não pode ser desfeita.`}
+        confirmText="Excluir"
+        cancelText="Cancelar"
+        type="danger"
+      />
     </div>
   );
 };

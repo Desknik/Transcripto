@@ -16,6 +16,8 @@ function App() {
     saveSelectedGroupId,
     updateGroupName,
     updateFileName,
+    deleteGroup,
+    deleteFile,
     reorderGroups,
     reorderFilesInGroup,
     moveFileBetweenGroups
@@ -104,6 +106,7 @@ function App() {
                 <GroupHeader 
                   group={selectedGroup}
                   onUpdateName={updateGroupName}
+                  onDeleteGroup={deleteGroup}
                 />
               )}
               
@@ -134,6 +137,7 @@ function App() {
                 <GroupHeader 
                   group={selectedGroup}
                   onUpdateName={updateGroupName}
+                  onDeleteGroup={deleteGroup}
                 />
               )}
               
@@ -142,6 +146,7 @@ function App() {
                 group={selectedGroup} 
                 showGroupHeader={false} 
                 onUpdateFileName={updateFileName} 
+                onDeleteFile={deleteFile}
               />
             </>
           )}

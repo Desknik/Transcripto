@@ -1,15 +1,18 @@
 import React, { useState } from 'react';
-import { Calendar, FileText, Folder, Copy, Check } from 'lucide-react';
+import { Calendar, FileText, Folder, Copy, Check, Trash2 } from 'lucide-react';
 import { TranscriptionGroup } from '../types';
 import EditableGroupHeader from './EditableGroupHeader';
+import ConfirmationModal from './ConfirmationModal';
 
 interface GroupHeaderProps {
   group: TranscriptionGroup;
   onUpdateName: (groupId: string, newName: string) => void;
+  onDeleteGroup?: (groupId: string) => void;
 }
 
-const GroupHeader: React.FC<GroupHeaderProps> = ({ group, onUpdateName }) => {
+const GroupHeader: React.FC<GroupHeaderProps> = ({ group, onUpdateName, onDeleteGroup }) => {
   const [copiedAll, setCopiedAll] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
 
   const copyAllTranscriptions = async () => {
     try {
@@ -68,30 +71,54 @@ const GroupHeader: React.FC<GroupHeaderProps> = ({ group, onUpdateName }) => {
               <span>{formatTime(group.createdAt)}</span>
             </div>
           </div>
-        </div>
+        </div>        {/* Botão Copiar Todas as Transcrições */}
+        <div className="flex items-center space-x-2">
+          <button
+            onClick={copyAllTranscriptions}
+            className={`flex items-center space-x-2 px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
+              copiedAll 
+                ? 'text-green-700 bg-green-50 border border-green-200' 
+                : 'text-gray-700 bg-gray-50 border border-gray-200 hover:bg-gray-100'
+            }`}
+          >
+            {copiedAll ? (
+              <>
+                <Check className="w-4 h-4" />
+                <span>Copiado!</span>
+              </>
+            ) : (
+              <>
+                <Copy className="w-4 h-4" />
+                <span>Copiar Todas</span>
+              </>
+            )}
+          </button>
 
-        {/* Botão Copiar Todas as Transcrições */}
-        <button
-          onClick={copyAllTranscriptions}
-          className={`flex items-center space-x-2 px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
-            copiedAll 
-              ? 'text-green-700 bg-green-50 border border-green-200' 
-              : 'text-gray-700 bg-gray-50 border border-gray-200 hover:bg-gray-100'
-          }`}
-        >
-          {copiedAll ? (
-            <>
-              <Check className="w-4 h-4" />
-              <span>Copiado!</span>
-            </>
-          ) : (
-            <>
-              <Copy className="w-4 h-4" />
-              <span>Copiar Todas</span>
-            </>
+          {/* Botão Excluir Grupo */}
+          {onDeleteGroup && (
+            <button
+              onClick={() => setShowDeleteModal(true)}
+              className="flex items-center space-x-2 px-4 py-2 text-sm font-medium text-red-700 bg-red-50 border border-red-200 rounded-lg hover:bg-red-100 transition-colors"
+              title="Excluir grupo"
+            >
+              <Trash2 className="w-4 h-4" />
+              <span>Excluir</span>
+            </button>
           )}
-        </button>
+        </div>
       </div>
+
+      {/* Modal de Confirmação */}
+      <ConfirmationModal
+        isOpen={showDeleteModal}
+        onClose={() => setShowDeleteModal(false)}
+        onConfirm={() => onDeleteGroup && onDeleteGroup(group.id)}
+        title="Excluir Grupo"
+        message={`Tem certeza que deseja excluir o grupo "${group.name}" e todas as suas transcrições? Esta ação não pode ser desfeita.`}
+        confirmText="Excluir"
+        cancelText="Cancelar"
+        type="danger"
+      />
     </div>
   );
 };
