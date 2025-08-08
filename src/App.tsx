@@ -15,6 +15,7 @@ function App() {
     saveSelectedFileId,
     saveSelectedGroupId,
     updateGroupName,
+    updateFileName,
     reorderGroups,
     reorderFilesInGroup,
     moveFileBetweenGroups
@@ -136,7 +137,12 @@ function App() {
                 />
               )}
               
-              <TranscriptionPanel file={selectedFile} group={selectedGroup} showGroupHeader={false} />
+              <TranscriptionPanel 
+                file={selectedFile} 
+                group={selectedGroup} 
+                showGroupHeader={false} 
+                onUpdateFileName={updateFileName} 
+              />
             </>
           )}
         </div>

@@ -118,18 +118,8 @@ const Sidebar: React.FC<SidebarProps> = ({
         const finalIndex = targetIndex >= 0 ? targetIndex : targetGroup.files.length;
         
         onMoveFileBetweenGroups(activeId, sourceGroup.id, targetGroup.id, finalIndex);
-      }
-    }  };
-  // Helper functions
-  const formatDate = (date: Date) => {
-    return date.toLocaleDateString('pt-BR', {
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric'
-    });
-  };
-
-  const getFileIcon = (file: TranscriptionFile) => {
+      }    }  };
+    const getFileIcon = (file: TranscriptionFile) => {
     if (file.type.includes('audio')) {
       return <Mic className="w-4 h-4 text-blue-500" />;
     }

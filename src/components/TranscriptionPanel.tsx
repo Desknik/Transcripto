@@ -2,14 +2,16 @@ import React, { useState } from 'react';
 import { FileAudio, FileVideo, Globe, Download, Mic, Copy, Check } from 'lucide-react';
 import { TranscriptionFile, TranscriptionGroup } from '../types';
 import { useAudioConverter } from '../hooks/useAudioConverter';
+import EditableFileName from './EditableFileName';
 
 interface TranscriptionPanelProps {
   file: TranscriptionFile | null;
   group: TranscriptionGroup | null;
   showGroupHeader?: boolean;
+  onUpdateFileName?: (fileId: string, newName: string) => void;
 }
 
-const TranscriptionPanel: React.FC<TranscriptionPanelProps> = ({ file, group, showGroupHeader = true }) => {
+const TranscriptionPanel: React.FC<TranscriptionPanelProps> = ({ file, group, showGroupHeader = true, onUpdateFileName }) => {
   const { downloadConvertedFile } = useAudioConverter();
   const [copied, setCopied] = useState(false);
 
@@ -129,13 +131,19 @@ const TranscriptionPanel: React.FC<TranscriptionPanelProps> = ({ file, group, sh
         
         {/* File Header */}
         <div className="border-b border-gray-200 p-6">
-          <div className="flex items-start justify-between">
-            <div className="flex items-start space-x-4">
+          <div className="flex items-start justify-between">            <div className="flex items-start space-x-4">
               {getFileIcon()}
               <div className="flex-1 min-w-0">
-                <h2 className="text-xl font-semibold text-gray-900 truncate">
-                  {file.name}
-                </h2>
+                {onUpdateFileName ? (
+                  <EditableFileName 
+                    file={file}
+                    onUpdateName={onUpdateFileName}
+                  />
+                ) : (
+                  <h2 className="text-xl font-semibold text-gray-900 truncate">
+                    {file.name}
+                  </h2>
+                )}
                 <div className="flex flex-wrap items-center gap-4 mt-2">
                   <span className="text-sm text-gray-600">
                     {formatFileSize(file.size)}

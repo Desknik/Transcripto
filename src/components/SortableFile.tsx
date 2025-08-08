@@ -33,12 +33,16 @@ export const SortableFile: React.FC<SortableFileProps> = ({
     transition,
     opacity: isDragging ? 0.5 : 1,
   };
+
   const getFileIcon = () => {
     return getIcon(file);
   };
+
   const getFileTitle = () => {
     return getTitle(file);
-  };  return (
+  };
+
+  return (
     <div
       ref={setNodeRef}
       style={style}
@@ -63,7 +67,8 @@ export const SortableFile: React.FC<SortableFileProps> = ({
         }`}
       >
         <div className="flex items-start space-x-3">
-          {getFileIcon()}          <div className="flex-1 min-w-0">
+          {getFileIcon()}
+          <div className="flex-1 min-w-0">
             <h5 className="font-medium text-gray-900 text-sm leading-tight">
               {getFileTitle()}
             </h5>

@@ -120,6 +120,17 @@ export const useElectronStore = () => {
     await saveGroups(updatedGroups);
   }, [groups, saveGroups]);
 
+  // Update file name
+  const updateFileName = useCallback(async (fileId: string, newName: string) => {
+    const updatedGroups = groups.map(group => ({
+      ...group,
+      files: group.files.map(file => 
+        file.id === fileId ? { ...file, name: newName } : file
+      )
+    }));
+    await saveGroups(updatedGroups);
+  }, [groups, saveGroups]);
+
   // Reorder groups
   const reorderGroups = useCallback(async (oldIndex: number, newIndex: number) => {
     const reorderedGroups = [...groups];
@@ -194,6 +205,7 @@ export const useElectronStore = () => {
     saveSelectedGroupId,
     saveExpandedGroups,
     updateGroupName,
+    updateFileName,
     reorderGroups,
     reorderFilesInGroup,
     moveFileBetweenGroups,
