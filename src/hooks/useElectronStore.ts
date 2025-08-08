@@ -142,13 +142,14 @@ export const useElectronStore = () => {
       await saveSelectedFileId(null);
     }
   }, [groups, saveGroups, selectedGroupId, saveSelectedGroupId, saveSelectedFileId]);
-
   // Delete file
   const deleteFile = useCallback(async (fileId: string) => {
+    const fileGroup = groups.find(group => group.files.some(file => file.id === fileId));
+    
     const updatedGroups = groups.map(group => ({
       ...group,
       files: group.files.filter(file => file.id !== fileId)
-    })).filter(group => group.files.length > 0); // Remove empty groups
+    })).filter(group => group.files.length > 0); // Remove grupos vazios
     
     await saveGroups(updatedGroups);
     
@@ -156,7 +157,15 @@ export const useElectronStore = () => {
     if (selectedFileId === fileId) {
       await saveSelectedFileId(null);
     }
-  }, [groups, saveGroups, selectedFileId, saveSelectedFileId]);
+
+    // Clear group selection if the group was deleted (became empty)
+    if (fileGroup) {
+      const groupStillExists = updatedGroups.some(g => g.id === fileGroup.id);
+      if (!groupStillExists && selectedGroupId === fileGroup.id) {
+        await saveSelectedGroupId(null);
+      }
+    }
+  }, [groups, saveGroups, selectedFileId, saveSelectedFileId, selectedGroupId, saveSelectedGroupId]);
 
   // Reorder groups
   const reorderGroups = useCallback(async (oldIndex: number, newIndex: number) => {
@@ -179,7 +188,6 @@ export const useElectronStore = () => {
     });
     await saveGroups(updatedGroups);
   }, [groups, saveGroups]);
-
   // Move file between groups
   const moveFileBetweenGroups = useCallback(async (
     fileId: string, 
@@ -202,10 +210,18 @@ export const useElectronStore = () => {
         return { ...group, files: newFiles };
       }
       return group;
-    });
+    }).filter(group => group.files.length > 0); // Remove grupos vazios
 
     await saveGroups(updatedGroups);
-  }, [groups, saveGroups]);
+
+    // Clear selections if the source group was deleted (became empty)
+    const sourceGroupStillExists = updatedGroups.some(g => g.id === sourceGroupId);
+    if (!sourceGroupStillExists && selectedGroupId === sourceGroupId) {
+      // Move selection to target group
+      await saveSelectedGroupId(targetGroupId);
+      await saveSelectedFileId(fileId);
+    }
+  }, [groups, saveGroups, selectedGroupId, saveSelectedGroupId, saveSelectedFileId]);
 
   // Clear all data
   const clearStore = useCallback(async () => {
