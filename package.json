@@ -1,7 +1,9 @@
 {
   "name": "transcripto",
   "private": true,
-  "version": "0.0.0",
+  "version": "1.0.0",
+  "description": "Aplicativo para transcrição de áudio usando AI",
+  "author": "Transcripto Team",
   "type": "module",
   "scripts": {
     "dev": "vite",

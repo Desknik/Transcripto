@@ -87,15 +87,7 @@ const FileUpload: React.FC<FileUploadProps> = ({ onFilesUploaded }) => {
   const formatDuration = (durationInSeconds: number): string => {
     const minutes = Math.floor(durationInSeconds / 60);
     const seconds = Math.floor(durationInSeconds % 60);
-    return `${minutes}:${seconds.toString().padStart(2, '0')}`;
-  };
-
-  const needsConversion = (file: File): boolean => {
-    const videoExtensions = ['mp4', 'mov', 'avi', 'mkv'];
-    const audioExtensions = ['wav', 'm4a', 'aac', 'ogg'];
-    const extension = file.name.split('.').pop()?.toLowerCase();
-    return [...videoExtensions, ...audioExtensions].includes(extension || '');
-  };
+    return `${minutes}:${seconds.toString().padStart(2, '0')}`;  };
 
   const processFiles = async (files: File[]) => {
     const newProgress: UploadProgress[] = files.map(file => ({

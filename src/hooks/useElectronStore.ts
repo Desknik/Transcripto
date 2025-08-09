@@ -1,13 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { TranscriptionGroup } from '../types';
 
-interface StoreData {
-  groups: TranscriptionGroup[];
-  selectedFileId: string | null;
-  selectedGroupId: string | null;
-  expandedGroups: string[];
-}
-
 export const useElectronStore = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [groups, setGroups] = useState<TranscriptionGroup[]>([]);

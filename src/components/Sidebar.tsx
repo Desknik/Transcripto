@@ -166,12 +166,10 @@ const Sidebar: React.FC<SidebarProps> = ({
             strategy={verticalListSortingStrategy}
           >
             <div className="space-y-3">
-              {groups.map((group) => (
-                <SortableGroup
+              {groups.map((group) => (                <SortableGroup
                   key={group.id}
                   group={group}
                   isExpanded={expandedGroups.has(group.id)}
-                  isSelected={selectedGroupId === group.id}
                   onToggle={() => toggleGroup(group.id)}
                   onUpdateName={onUpdateGroupName}
                   onNewTranscription={onNewTranscription}

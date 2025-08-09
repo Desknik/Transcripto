@@ -8,7 +8,6 @@ import EditableGroupHeader from './EditableGroupHeader';
 interface SortableGroupProps {
   group: TranscriptionGroup;
   isExpanded: boolean;
-  isSelected: boolean;
   onToggle: () => void;
   onUpdateName: (groupId: string, newName: string) => void;
   onNewTranscription: (groupId: string) => void;
@@ -18,7 +17,6 @@ interface SortableGroupProps {
 export const SortableGroup: React.FC<SortableGroupProps> = ({
   group,
   isExpanded,
-  isSelected,
   onToggle,
   onUpdateName,
   onNewTranscription,
