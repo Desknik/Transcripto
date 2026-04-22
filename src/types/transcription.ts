@@ -10,11 +10,14 @@ export interface TranscriptionModel {
   description?: string;
 }
 
+export type OutputFormat = 'json' | 'text' | 'srt' | 'verbose_json' | 'vtt';
+
 export interface TranscriptionRequest {
   filePath: string;
   provider: string;
   model: string;
   language?: string;
+  outputFormat?: OutputFormat;
 }
 
 export interface TranscriptionResponse {

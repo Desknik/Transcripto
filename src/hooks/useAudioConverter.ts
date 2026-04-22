@@ -91,6 +91,41 @@ export const useAudioConverter = () => {
     }
   }, []);
 
+  const downloadTranscription = useCallback(async (content: string, _fileName: string, extension: string) => {
+    if (!window.electronAPI) {
+      return { canceled: true };
+    }
+
+    try {
+      const saveDialog = await window.electronAPI.saveFileDialog();
+      
+      if (saveDialog.canceled || !saveDialog.filePath) {
+        return { canceled: true };
+      }
+
+      // Add extension if not present
+      let finalPath = saveDialog.filePath;
+      if (!finalPath.endsWith('.' + extension)) {
+        finalPath = finalPath + '.' + extension;
+      }
+
+      // Write content to file
+      const encoder = new TextEncoder();
+      const uint8Array = encoder.encode(content);
+      const buffer = uint8Array.buffer as ArrayBuffer;
+      const result = await window.electronAPI.saveFileToDisk(buffer, finalPath);
+      
+      if (result.success) {
+        return { canceled: false, filePath: finalPath };
+      } else {
+        throw new Error(result.error || 'Falha ao salvar arquivo');
+      }
+    } catch (error) {
+      console.error('Erro ao baixar transcrição:', error);
+      return { canceled: true, error: error instanceof Error ? error.message : 'Erro desconhecido' };
+    }
+  }, []);
+
   // Keep the old function for backward compatibility
   const convertAudio = useCallback(async (filePath: string, fileId: string): Promise<ConversionResult> => {
     if (!window.electronAPI) {
@@ -152,6 +187,7 @@ export const useAudioConverter = () => {
     convertAudio,
     convertAudioFile,
     downloadConvertedFile,
+    downloadTranscription,
     saveFileDialog,
     isConverting,
     conversionProgress,

@@ -3,6 +3,7 @@ import { Upload, FileAudio, FileVideo, X } from 'lucide-react';
 import { TranscriptionFile, UploadProgress } from '../types';
 import { useAudioConverter } from '../hooks/useAudioConverter';
 import TranscriptionProviderSelector from './TranscriptionProviderSelector';
+import { OutputFormat } from '../types/transcription';
 
 interface FileUploadProps {
   onFilesUploaded: (files: TranscriptionFile[], groupId?: string) => void;
@@ -13,6 +14,7 @@ const FileUpload: React.FC<FileUploadProps> = ({ onFilesUploaded }) => {
   const [uploadProgress, setUploadProgress] = useState<UploadProgress[]>([]);
   const [selectedProvider, setSelectedProvider] = useState<string | null>(null);
   const [selectedModel, setSelectedModel] = useState<string | null>(null);
+  const [selectedFormat, setSelectedFormat] = useState<OutputFormat>('text');
   const { convertAudioFile } = useAudioConverter();
 
   const acceptedMimeTypes = React.useMemo(() => [
@@ -46,6 +48,9 @@ const FileUpload: React.FC<FileUploadProps> = ({ onFilesUploaded }) => {
     setSelectedProvider(provider);
     setSelectedModel(model);
   };
+  const handleFormatChange = (format: OutputFormat) => {
+    setSelectedFormat(format);
+  };
   const transcribeAudio = async (filePath: string): Promise<{ success: boolean; text?: string; language?: string; duration?: string; error?: string }> => {
     if (!window.electronAPI || !selectedProvider || !selectedModel) {
       return { 
@@ -59,6 +64,7 @@ const FileUpload: React.FC<FileUploadProps> = ({ onFilesUploaded }) => {
         filePath,
         provider: selectedProvider,
         model: selectedModel,
+        outputFormat: selectedFormat,
       });
 
       if (result.success && result.text) {
@@ -415,7 +421,9 @@ const FileUpload: React.FC<FileUploadProps> = ({ onFilesUploaded }) => {
       <TranscriptionProviderSelector
         selectedProvider={selectedProvider}
         selectedModel={selectedModel}
+        selectedFormat={selectedFormat}
         onProviderChange={handleProviderChange}
+        onFormatChange={handleFormatChange}
       />
       
       <div

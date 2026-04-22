@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { FileAudio, FileVideo, Globe, Download, Mic, Copy, Check, Trash2 } from 'lucide-react';
+import React, { useState, useRef, useEffect } from 'react';
+import { FileAudio, FileVideo, Globe, Download, Mic, Copy, Check, Trash2, ChevronDown } from 'lucide-react';
 import { TranscriptionFile, TranscriptionGroup } from '../types';
 import { useAudioConverter } from '../hooks/useAudioConverter';
 import EditableFileName from './EditableFileName';
@@ -14,9 +14,21 @@ interface TranscriptionPanelProps {
 }
 
 const TranscriptionPanel: React.FC<TranscriptionPanelProps> = ({ file, group, showGroupHeader = true, onUpdateFileName, onDeleteFile }) => {
-  const { downloadConvertedFile } = useAudioConverter();
+  const { downloadConvertedFile, downloadTranscription } = useAudioConverter();
   const [copied, setCopied] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [showDownloadDropdown, setShowDownloadDropdown] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setShowDownloadDropdown(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   const copyToClipboard = async (text: string) => {
     try {
@@ -179,7 +191,56 @@ const TranscriptionPanel: React.FC<TranscriptionPanelProps> = ({ file, group, sh
               </div>
             </div>            
             {/* Download and Delete Buttons */}
-            <div className="flex items-center space-x-2">
+            <div className="flex items-center space-x-2" ref={dropdownRef}>
+              <div className="relative">
+                <button 
+                  className="flex items-center space-x-2 px-4 py-2 text-sm font-medium text-blue-700 bg-blue-50 border border-blue-200 rounded-lg hover:bg-blue-100 transition-colors"
+                  onClick={() => setShowDownloadDropdown(!showDownloadDropdown)}
+                >
+                  <Download className="w-4 h-4" />
+                  <span>Baixar</span>
+                  <ChevronDown className={`w-4 h-4 transition-transform ${showDownloadDropdown ? 'rotate-180' : ''}`} />
+                </button>
+                
+                {showDownloadDropdown && (
+                  <div className="absolute z-10 mt-1 w-40 bg-white border border-gray-200 rounded-lg shadow-lg">
+                    <button
+                      className="w-full px-4 py-2 text-left text-sm hover:bg-gray-50 rounded-t-lg"
+                      onClick={() => {
+                        const baseName = file.name.replace(/\.[^/.]+$/, '');
+                        downloadTranscription(file.content, baseName, 'txt');
+                        setShowDownloadDropdown(false);
+                      }}
+                    >
+                      Texto (.txt)
+                    </button>
+                    <button
+                      className="w-full px-4 py-2 text-left text-sm hover:bg-gray-50"
+                      onClick={() => {
+                        const baseName = file.name.replace(/\.[^/.]+$/, '');
+                        downloadTranscription(file.content, baseName, 'srt');
+                        setShowDownloadDropdown(false);
+                      }}
+                    >
+                      SubRip (.srt)
+                    </button>
+                    <button
+                      className="w-full px-4 py-2 text-left text-sm hover:bg-gray-50 rounded-b-lg"
+                      onClick={() => {
+                        const baseName = file.name.replace(/\.[^/.]+$/, '');
+                        const vttContent = file.content
+                          .replace(/^(\d+\n\d{2}:\d{2}:\d{2}),(\d{3})/gm, '$1.$2')
+                          .replace(/^WEBVTT/, 'WEBVTT\n\n');
+                        downloadTranscription(vttContent, baseName, 'vtt');
+                        setShowDownloadDropdown(false);
+                      }}
+                    >
+                      WebVTT (.vtt)
+                    </button>
+                  </div>
+                )}
+              </div>
+
               {file.isConverted && file.convertedPath && (
                 <button 
                   className="flex items-center space-x-2 px-4 py-2 text-sm font-medium text-blue-700 bg-blue-50 border border-blue-200 rounded-lg hover:bg-blue-100 transition-colors"
