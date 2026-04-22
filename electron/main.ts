@@ -116,7 +116,24 @@ app.on('activate', () => {
 ipcMain.handle('convert-audio', async (_, filePath: string) => {
   try {
     const tempDir = os.tmpdir()
-    const outputPath = await convertToMp3(filePath, tempDir)
+    let inputPath = filePath
+
+    // Always copy to temp directory to avoid processing files in the project directory
+    if (path.isAbsolute(filePath)) {
+      const fileName = path.basename(filePath)
+      const tempFilePath = path.join(tempDir, `${Date.now()}_${fileName}`)
+      await fs.promises.copyFile(filePath, tempFilePath)
+      inputPath = tempFilePath
+    } else {
+      // If path is relative, try to resolve it
+      const resolvedPath = path.resolve(filePath)
+      const fileName = path.basename(resolvedPath)
+      const tempFilePath = path.join(tempDir, `${Date.now()}_${fileName}`)
+      await fs.promises.copyFile(resolvedPath, tempFilePath)
+      inputPath = tempFilePath
+    }
+
+    const outputPath = await convertToMp3(inputPath, tempDir)
     return { success: true, outputPath }
   } catch (error) {
     console.error('Conversion error:', error)
@@ -134,8 +151,11 @@ ipcMain.handle('save-file-dialog', async (_, options?: { filters?: { name: strin
 
 ipcMain.handle('save-file-to-disk', async (_, fileBuffer: Buffer, fileName: string) => {
   try {
-    await fs.promises.writeFile(fileName, fileBuffer)
-    return { success: true, filePath: fileName }
+    // Always save to temp directory to avoid creating files in project directory
+    const tempDir = os.tmpdir()
+    const tempFilePath = path.join(tempDir, `${Date.now()}_${fileName}`)
+    await fs.promises.writeFile(tempFilePath, fileBuffer)
+    return { success: true, filePath: tempFilePath }
   } catch (error) {
     console.error('Error saving file to disk:', error)
     return { success: false, error: error instanceof Error ? error.message : 'Unknown error' }
