@@ -21782,18 +21782,29 @@ class OpenAITranscriptionService extends BaseTranscriptionService {
     try {
       this.validateRequest(request);
       console.log("Starting OpenAI transcription for:", request.filePath);
+      const format2 = request.outputFormat || "verbose_json";
       const transcription = await this.openai.audio.transcriptions.create({
         file: require$$0$1.createReadStream(request.filePath),
         model: request.model || "whisper-1",
-        response_format: request.outputFormat || "verbose_json",
+        response_format: format2,
         language: request.language || void 0
       });
       console.log("OpenAI transcription completed successfully");
+      let text;
+      let language = request.language;
+      let duration;
+      if (format2 === "json" || format2 === "verbose_json") {
+        text = JSON.stringify(transcription, null, 2);
+        language = transcription.language || request.language;
+        duration = transcription.duration;
+      } else {
+        text = transcription;
+      }
       return {
         success: true,
-        text: transcription.text,
-        language: transcription.language || request.language,
-        duration: transcription.duration
+        text,
+        language,
+        duration
       };
     } catch (error2) {
       console.error("OpenAI transcription error:", error2);
@@ -21939,19 +21950,17 @@ ipcMain$1.handle("convert-audio", async (_, filePath) => {
     return { success: false, error: error2 instanceof Error ? error2.message : "Unknown error" };
   }
 });
-ipcMain$1.handle("save-file-dialog", async () => {
+ipcMain$1.handle("save-file-dialog", async (_, options) => {
   const result = await dialog.showSaveDialog(win, {
-    filters: [{ name: "MP3 Files", extensions: ["mp3"] }],
-    defaultPath: "converted_audio.mp3"
+    filters: (options == null ? void 0 : options.filters) || [{ name: "All Files", extensions: ["*"] }],
+    defaultPath: (options == null ? void 0 : options.defaultPath) || "transcription.txt"
   });
   return result;
 });
 ipcMain$1.handle("save-file-to-disk", async (_, fileBuffer, fileName) => {
   try {
-    const tempDir = os$1.tmpdir();
-    const tempFilePath = path$2.join(tempDir, fileName);
-    await fs$1.promises.writeFile(tempFilePath, fileBuffer);
-    return { success: true, filePath: tempFilePath };
+    await fs$1.promises.writeFile(fileName, fileBuffer);
+    return { success: true, filePath: fileName };
   } catch (error2) {
     console.error("Error saving file to disk:", error2);
     return { success: false, error: error2 instanceof Error ? error2.message : "Unknown error" };

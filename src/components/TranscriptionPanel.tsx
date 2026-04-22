@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { FileAudio, FileVideo, Globe, Download, Mic, Copy, Check, Trash2, ChevronDown } from 'lucide-react';
+import { FileAudio, FileVideo, Globe, Download, Mic, Copy, Check, Trash2, ChevronDown, Plus } from 'lucide-react';
 import { TranscriptionFile, TranscriptionGroup } from '../types';
+import { OutputFormat, FORMAT_LABELS, FORMAT_EXTENSIONS } from '../types/transcription';
 import { useAudioConverter } from '../hooks/useAudioConverter';
 import EditableFileName from './EditableFileName';
 import ConfirmationModal from './ConfirmationModal';
@@ -11,19 +12,37 @@ interface TranscriptionPanelProps {
   showGroupHeader?: boolean;
   onUpdateFileName?: (fileId: string, newName: string) => void;
   onDeleteFile?: (fileId: string) => void;
+  onGenerateFormat?: (fileId: string, format: OutputFormat) => void;
+  onActiveFormatChange?: (fileId: string, format: OutputFormat) => void;
 }
 
-const TranscriptionPanel: React.FC<TranscriptionPanelProps> = ({ file, group, showGroupHeader = true, onUpdateFileName, onDeleteFile }) => {
+const AVAILABLE_FORMATS: OutputFormat[] = ['text', 'srt', 'vtt', 'json', 'verbose_json'];
+
+const TranscriptionPanel: React.FC<TranscriptionPanelProps> = ({ 
+  file, 
+  group, 
+  showGroupHeader = true, 
+  onUpdateFileName, 
+  onDeleteFile,
+  onGenerateFormat,
+  onActiveFormatChange
+}) => {
   const { downloadConvertedFile, downloadTranscription } = useAudioConverter();
   const [copied, setCopied] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [showDownloadDropdown, setShowDownloadDropdown] = useState(false);
-  const dropdownRef = useRef<HTMLDivElement>(null);
+  const [showGenerateDropdown, setShowGenerateDropdown] = useState(false);
+  const [isGenerating, setIsGenerating] = useState(false);
+  const downloadRef = useRef<HTMLDivElement>(null);
+  const generateRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+      if (downloadRef.current && !downloadRef.current.contains(event.target as Node)) {
         setShowDownloadDropdown(false);
+      }
+      if (generateRef.current && !generateRef.current.contains(event.target as Node)) {
+        setShowGenerateDropdown(false);
       }
     };
     document.addEventListener('mousedown', handleClickOutside);
@@ -43,7 +62,6 @@ const TranscriptionPanel: React.FC<TranscriptionPanelProps> = ({ file, group, sh
   if (!file) {
     return (
       <div className="flex-1 flex flex-col bg-white">
-        {/* Header */}
         {group && showGroupHeader && (
           <header className="bg-white border-b border-gray-200 px-6 py-4">
             <div className="flex items-center space-x-3">
@@ -83,6 +101,11 @@ const TranscriptionPanel: React.FC<TranscriptionPanelProps> = ({ file, group, sh
     );
   }
 
+  const transcriptions = file.transcriptions || [];
+  const activeTranscription = transcriptions.find(t => t.format === file.activeFormat) || transcriptions[0];
+  const existingFormats = transcriptions.map(t => t.format);
+  const availableFormatsToGenerate = AVAILABLE_FORMATS.filter(f => !existingFormats.includes(f));
+
   const getFileIcon = () => {
     const extension = file.name.split('.').pop()?.toLowerCase();
     if (['mp4', 'mov', 'avi', 'mkv'].includes(extension || '')) {
@@ -118,10 +141,28 @@ const TranscriptionPanel: React.FC<TranscriptionPanelProps> = ({ file, group, sh
     return languages[code] || code;
   };
 
+  const handleDownload = async (format: OutputFormat) => {
+    const transcription = transcriptions.find(t => t.format === format);
+    if (!transcription) return;
+
+    const baseName = file.name.replace(/\.[^/.]+$/, '');
+    const extension = FORMAT_EXTENSIONS[format];
+    await downloadTranscription(transcription.content, baseName, extension);
+    setShowDownloadDropdown(false);
+  };
+
+  const handleGenerate = async (format: OutputFormat) => {
+    if (onGenerateFormat) {
+      setIsGenerating(true);
+      setShowGenerateDropdown(false);
+      await onGenerateFormat(file.id, format);
+      setIsGenerating(false);
+    }
+  };
+
   return (
     <div className="flex-1 bg-white overflow-hidden">
       <div className="h-full flex flex-col">
-        {/* Group Header */}
         {group && showGroupHeader && (
           <header className="bg-white border-b border-gray-200 px-6 py-4">
             <div className="flex items-center space-x-3">
@@ -144,9 +185,9 @@ const TranscriptionPanel: React.FC<TranscriptionPanelProps> = ({ file, group, sh
           </header>
         )}
         
-        {/* File Header */}
         <div className="border-b border-gray-200 p-6">
-          <div className="flex items-start justify-between">            <div className="flex items-start space-x-4">
+          <div className="flex items-start justify-between">
+            <div className="flex items-start space-x-4">
               {getFileIcon()}
               <div className="flex-1 min-w-0">
                 {onUpdateFileName ? (
@@ -189,10 +230,10 @@ const TranscriptionPanel: React.FC<TranscriptionPanelProps> = ({ file, group, sh
                   )}
                 </div>
               </div>
-            </div>            
-            {/* Download and Delete Buttons */}
-            <div className="flex items-center space-x-2" ref={dropdownRef}>
-              <div className="relative">
+            </div>
+            
+            <div className="flex items-center space-x-2">
+              <div className="relative" ref={downloadRef}>
                 <button 
                   className="flex items-center space-x-2 px-4 py-2 text-sm font-medium text-blue-700 bg-blue-50 border border-blue-200 rounded-lg hover:bg-blue-100 transition-colors"
                   onClick={() => setShowDownloadDropdown(!showDownloadDropdown)}
@@ -203,40 +244,46 @@ const TranscriptionPanel: React.FC<TranscriptionPanelProps> = ({ file, group, sh
                 </button>
                 
                 {showDownloadDropdown && (
-                  <div className="absolute z-10 mt-1 w-40 bg-white border border-gray-200 rounded-lg shadow-lg">
-                    <button
-                      className="w-full px-4 py-2 text-left text-sm hover:bg-gray-50 rounded-t-lg"
-                      onClick={() => {
-                        const baseName = file.name.replace(/\.[^/.]+$/, '');
-                        downloadTranscription(file.content, baseName, 'txt');
-                        setShowDownloadDropdown(false);
-                      }}
-                    >
-                      Texto (.txt)
-                    </button>
-                    <button
-                      className="w-full px-4 py-2 text-left text-sm hover:bg-gray-50"
-                      onClick={() => {
-                        const baseName = file.name.replace(/\.[^/.]+$/, '');
-                        downloadTranscription(file.content, baseName, 'srt');
-                        setShowDownloadDropdown(false);
-                      }}
-                    >
-                      SubRip (.srt)
-                    </button>
-                    <button
-                      className="w-full px-4 py-2 text-left text-sm hover:bg-gray-50 rounded-b-lg"
-                      onClick={() => {
-                        const baseName = file.name.replace(/\.[^/.]+$/, '');
-                        const vttContent = file.content
-                          .replace(/^(\d+\n\d{2}:\d{2}:\d{2}),(\d{3})/gm, '$1.$2')
-                          .replace(/^WEBVTT/, 'WEBVTT\n\n');
-                        downloadTranscription(vttContent, baseName, 'vtt');
-                        setShowDownloadDropdown(false);
-                      }}
-                    >
-                      WebVTT (.vtt)
-                    </button>
+                  <div className="absolute z-10 right-0 mt-1 w-48 bg-white border border-gray-200 rounded-lg shadow-lg">
+                    {transcriptions.map((t, index) => (
+                      <button
+                        key={t.id}
+                        className={`w-full px-4 py-2 text-left text-sm hover:bg-gray-50 transition-colors ${
+                          index === 0 ? 'rounded-t-lg' : ''
+                        } ${index === transcriptions.length - 1 ? 'rounded-b-lg' : ''}`}
+                        onClick={() => handleDownload(t.format)}
+                      >
+                        {FORMAT_LABELS[t.format]} ({FORMAT_EXTENSIONS[t.format]})
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <div className="relative" ref={generateRef}>
+                <button 
+                  className="flex items-center space-x-2 px-4 py-2 text-sm font-medium text-green-700 bg-green-50 border border-green-200 rounded-lg hover:bg-green-100 transition-colors disabled:opacity-50"
+                  onClick={() => setShowGenerateDropdown(!showGenerateDropdown)}
+                  disabled={isGenerating || availableFormatsToGenerate.length === 0}
+                >
+                  <Plus className="w-4 h-4" />
+                  <span>{isGenerating ? 'Gerando...' : 'Gerar'}</span>
+                  <ChevronDown className={`w-4 h-4 transition-transform ${showGenerateDropdown ? 'rotate-180' : ''}`} />
+                </button>
+                
+                {showGenerateDropdown && availableFormatsToGenerate.length > 0 && (
+                  <div className="absolute z-10 right-0 mt-1 w-48 bg-white border border-gray-200 rounded-lg shadow-lg">
+                    {availableFormatsToGenerate.map((format, index) => (
+                      <button
+                        key={format}
+                        className={`w-full px-4 py-2 text-left text-sm hover:bg-gray-50 transition-colors ${
+                          index === 0 ? 'rounded-t-lg' : ''
+                        } ${index === availableFormatsToGenerate.length - 1 ? 'rounded-b-lg' : ''}`}
+                        onClick={() => handleGenerate(format)}
+                      >
+                        {FORMAT_LABELS[format]}
+                      </button>
+                    ))}
                   </div>
                 )}
               </div>
@@ -258,7 +305,6 @@ const TranscriptionPanel: React.FC<TranscriptionPanelProps> = ({ file, group, sh
                 </button>
               )}
 
-              {/* Botão Excluir Arquivo */}
               {onDeleteFile && (
                 <button
                   onClick={() => setShowDeleteModal(true)}
@@ -273,15 +319,34 @@ const TranscriptionPanel: React.FC<TranscriptionPanelProps> = ({ file, group, sh
           </div>
         </div>
 
-        {/* Content */}
+        <div className="border-b border-gray-200 bg-gray-50">
+          <div className="flex items-center px-6 py-2 space-x-1 overflow-x-auto">
+            {transcriptions.map((transcription) => (
+              <button
+                key={transcription.id}
+                className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors whitespace-nowrap ${
+                  file.activeFormat === transcription.format
+                    ? 'bg-white text-blue-700 shadow-sm border border-blue-200'
+                    : 'text-gray-600 hover:bg-white hover:text-gray-900'
+                }`}
+                onClick={() => {
+                  onActiveFormatChange?.(file.id, transcription.format);
+                }}
+              >
+                {FORMAT_LABELS[transcription.format]}
+              </button>
+            ))}
+          </div>
+        </div>
+
         <div className="flex-1 overflow-y-auto p-6">
           <div className="max-w-4xl">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-lg font-medium text-gray-900">
-                Transcrição
+                {FORMAT_LABELS[activeTranscription?.format || 'text']}
               </h2>
               <button
-                onClick={() => copyToClipboard(file.content)}
+                onClick={() => activeTranscription && copyToClipboard(activeTranscription.content)}
                 className={`flex items-center space-x-2 px-3 py-2 text-sm font-medium rounded-lg transition-colors ${
                   copied 
                     ? 'text-green-700 bg-green-50 border border-green-200' 
@@ -303,37 +368,38 @@ const TranscriptionPanel: React.FC<TranscriptionPanelProps> = ({ file, group, sh
             </div>
             <div className="bg-gray-50 rounded-lg p-6 border border-gray-200">
               <div className="prose prose-gray max-w-none">
-                <p className="text-gray-800 leading-relaxed whitespace-pre-wrap">
-                  {file.content}
-                </p>
+                <pre className="text-gray-800 leading-relaxed whitespace-pre-wrap font-sans text-sm overflow-x-auto">
+                  {activeTranscription?.content || 'Sem conteúdo'}
+                </pre>
               </div>
             </div>
             
-            {/* Stats */}
-            <div className="mt-6 grid grid-cols-1 sm:grid-cols-3 gap-4">
-              <div className="bg-blue-50 rounded-lg p-4 text-center">
-                <div className="text-2xl font-bold text-blue-600">
-                  {file.content.split(' ').length}
+            {activeTranscription && (
+              <div className="mt-6 grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div className="bg-blue-50 rounded-lg p-4 text-center">
+                  <div className="text-2xl font-bold text-blue-600">
+                    {activeTranscription.content.split(' ').length}
+                  </div>
+                  <div className="text-sm text-blue-600 font-medium">Palavras</div>
                 </div>
-                <div className="text-sm text-blue-600 font-medium">Palavras</div>
-              </div>
-              <div className="bg-emerald-50 rounded-lg p-4 text-center">
-                <div className="text-2xl font-bold text-emerald-600">
-                  {file.content.length}
+                <div className="bg-emerald-50 rounded-lg p-4 text-center">
+                  <div className="text-2xl font-bold text-emerald-600">
+                    {activeTranscription.content.length}
+                  </div>
+                  <div className="text-sm text-emerald-600 font-medium">Caracteres</div>
                 </div>
-                <div className="text-sm text-emerald-600 font-medium">Caracteres</div>
-              </div>
-              <div className="bg-purple-50 rounded-lg p-4 text-center">
-                <div className="text-2xl font-bold text-purple-600">
-                  {Math.ceil(file.content.split(' ').length / 150)}
+                <div className="bg-purple-50 rounded-lg p-4 text-center">
+                  <div className="text-2xl font-bold text-purple-600">
+                    {Math.ceil(activeTranscription.content.split(' ').length / 150)}
+                  </div>
+                  <div className="text-sm text-purple-600 font-medium">Min. leitura</div>
                 </div>
-                <div className="text-sm text-purple-600 font-medium">Min. leitura</div>
               </div>
-            </div>          </div>
+            )}
+          </div>
         </div>
       </div>
 
-      {/* Modal de Confirmação */}
       <ConfirmationModal
         isOpen={showDeleteModal}
         onClose={() => setShowDeleteModal(false)}

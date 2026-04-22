@@ -34,20 +34,35 @@ export class OpenAITranscriptionService extends BaseTranscriptionService {
 
       console.log('Starting OpenAI transcription for:', request.filePath);
 
+      const format = request.outputFormat || 'verbose_json';
       const transcription = await this.openai.audio.transcriptions.create({
         file: fs.createReadStream(request.filePath),
         model: request.model || 'whisper-1',
-        response_format: request.outputFormat || 'verbose_json',
+        response_format: format,
         language: request.language || undefined,
       }) as any;
 
       console.log('OpenAI transcription completed successfully');
 
+      let text: string;
+      let language = request.language;
+      let duration: number | undefined;
+
+      if (format === 'json' || format === 'verbose_json') {
+        // For JSON formats, return the full JSON string
+        text = JSON.stringify(transcription, null, 2);
+        language = transcription.language || request.language;
+        duration = transcription.duration;
+      } else {
+        // For text/srt/vtt, the response is a string
+        text = transcription;
+      }
+
       return {
         success: true,
-        text: transcription.text,
-        language: (transcription as any).language || request.language,
-        duration: (transcription as any).duration,
+        text,
+        language,
+        duration,
       };    } catch (error) {
       console.error('OpenAI transcription error:', error);
       

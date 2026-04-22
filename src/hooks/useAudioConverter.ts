@@ -72,7 +72,13 @@ export const useAudioConverter = () => {
     }
 
     try {
-      const saveDialog = await window.electronAPI.saveFileDialog();
+      const fileName = convertedPath.split(/[/\\]/).pop() || 'audio.mp3';
+      const baseName = fileName.replace(/\.[^/.]+$/, '');
+      
+      const saveDialog = await window.electronAPI.saveFileDialog({
+        filters: [{ name: 'MP3 Files', extensions: ['mp3'] }],
+        defaultPath: baseName + '.mp3'
+      });
       
       if (saveDialog.canceled || !saveDialog.filePath) {
         return { canceled: true };
@@ -91,32 +97,29 @@ export const useAudioConverter = () => {
     }
   }, []);
 
-  const downloadTranscription = useCallback(async (content: string, _fileName: string, extension: string) => {
+  const downloadTranscription = useCallback(async (content: string, fileName: string, extension: string) => {
     if (!window.electronAPI) {
       return { canceled: true };
     }
 
     try {
-      const saveDialog = await window.electronAPI.saveFileDialog();
+      const saveDialog = await window.electronAPI.saveFileDialog({
+        filters: [{ name: extension.toUpperCase() + ' Files', extensions: [extension] }],
+        defaultPath: fileName + '.' + extension
+      });
       
       if (saveDialog.canceled || !saveDialog.filePath) {
         return { canceled: true };
-      }
-
-      // Add extension if not present
-      let finalPath = saveDialog.filePath;
-      if (!finalPath.endsWith('.' + extension)) {
-        finalPath = finalPath + '.' + extension;
       }
 
       // Write content to file
       const encoder = new TextEncoder();
       const uint8Array = encoder.encode(content);
       const buffer = uint8Array.buffer as ArrayBuffer;
-      const result = await window.electronAPI.saveFileToDisk(buffer, finalPath);
+      const result = await window.electronAPI.saveFileToDisk(buffer, saveDialog.filePath);
       
       if (result.success) {
-        return { canceled: false, filePath: finalPath };
+        return { canceled: false, filePath: saveDialog.filePath };
       } else {
         throw new Error(result.error || 'Falha ao salvar arquivo');
       }

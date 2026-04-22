@@ -4,6 +4,7 @@ import Sidebar from './components/Sidebar';
 import TranscriptionPanel from './components/TranscriptionPanel';
 import GroupHeader from './components/GroupHeader';
 import { TranscriptionFile, TranscriptionGroup } from './types';
+import { OutputFormat, TranscriptionEntry } from './types/transcription';
 import { useElectronStore } from './hooks/useElectronStore';
 
 function App() {
@@ -25,7 +26,6 @@ function App() {
 
   const handleFilesUploaded = async (files: TranscriptionFile[], groupId?: string) => {
     if (groupId) {
-      // Adicionar arquivos a um grupo existente
       const updatedGroups = groups.map(group => 
         group.id === groupId 
           ? { ...group, files: [...group.files, ...files] }
@@ -33,7 +33,6 @@ function App() {
       );
       await saveGroups(updatedGroups);
     } else {
-      // Criar novo grupo (sempre agrupa, mesmo para um arquivo)
       const newGroup: TranscriptionGroup = {
         id: crypto.randomUUID(),
         name: `Transcrição ${new Date().toLocaleDateString('pt-BR')} - ${new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`,
@@ -45,10 +44,61 @@ function App() {
       await saveSelectedGroupId(newGroup.id);
     }
     
-    // Auto-select first file
     if (files.length > 0) {
       await saveSelectedFileId(files[0].id);
     }
+  };
+
+  const handleGenerateFormat = async (fileId: string, format: OutputFormat) => {
+    const file = groups.flatMap(g => g.files).find(f => f.id === fileId);
+    if (!file || !file.audioPath) return;
+
+    try {
+      const result = await window.electronAPI.transcribeAudio({
+        filePath: file.audioPath,
+        provider: file.transcriptionProvider || 'openai',
+        model: file.transcriptionModel || 'whisper-1',
+        outputFormat: format,
+      });
+
+      if (result.success && result.text) {
+        const newEntry: TranscriptionEntry = {
+          id: crypto.randomUUID(),
+          format,
+          content: result.text,
+          createdAt: new Date(),
+          language: result.language || file.language,
+          duration: result.duration,
+        };
+
+        const updatedGroups = groups.map(group => ({
+          ...group,
+          files: group.files.map(f => 
+            f.id === fileId 
+              ? { 
+                  ...f, 
+                  transcriptions: [...f.transcriptions, newEntry],
+                  activeFormat: format 
+                }
+              : f
+          )
+        }));
+
+        await saveGroups(updatedGroups);
+      }
+    } catch (error) {
+      console.error('Erro ao gerar formato:', error);
+    }
+  };
+
+  const handleActiveFormatChange = async (fileId: string, format: OutputFormat) => {
+    const updatedGroups = groups.map(group => ({
+      ...group,
+      files: group.files.map(f => 
+        f.id === fileId ? { ...f, activeFormat: format } : f
+      )
+    }));
+    await saveGroups(updatedGroups);
   };
 
   const handleFileSelect = async (fileId: string | null) => {
@@ -147,6 +197,8 @@ function App() {
                 showGroupHeader={false} 
                 onUpdateFileName={updateFileName} 
                 onDeleteFile={deleteFile}
+                onGenerateFormat={handleGenerateFormat}
+                onActiveFormatChange={handleActiveFormatChange}
               />
             </>
           )}

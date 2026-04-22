@@ -24,4 +24,16 @@ declare namespace NodeJS {
 // Used in Renderer process, expose in `preload.ts`
 interface Window {
   ipcRenderer: import('electron').IpcRenderer
+  electronAPI: {
+    convertAudio: (filePath: string) => Promise<any>;
+    saveFileDialog: (options?: { filters?: { name: string; extensions: string[] }[]; defaultPath?: string }) => Promise<{ canceled: boolean; filePath?: string }>;
+    saveFileToDisk: (fileBuffer: ArrayBuffer, fileName: string) => Promise<{ success: boolean; filePath?: string; error?: string }>;
+    copyFile: (sourcePath: string, targetPath: string) => Promise<any>;
+    getTranscriptionProviders: () => Promise<any>;
+    transcribeAudio: (request: any) => Promise<any>;
+    storeGet: (key: string) => Promise<any>;
+    storeSet: (key: string, value: any) => Promise<any>;
+    storeDelete: (key: string) => Promise<any>;
+    storeClear: () => Promise<any>;
+  }
 }

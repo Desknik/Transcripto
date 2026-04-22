@@ -1,6 +1,7 @@
 import React, { useCallback, useState } from 'react';
 import { Upload, FileAudio, FileVideo, X } from 'lucide-react';
 import { TranscriptionFile, UploadProgress } from '../types';
+import { TranscriptionEntry } from '../types/transcription';
 import { useAudioConverter } from '../hooks/useAudioConverter';
 import TranscriptionProviderSelector from './TranscriptionProviderSelector';
 import { OutputFormat } from '../types/transcription';
@@ -35,23 +36,17 @@ const FileUpload: React.FC<FileUploadProps> = ({ onFilesUploaded }) => {
   ], []);
   const acceptedExtensionsArray = React.useMemo(() => ['mp3','wav','m4a','aac','ogg','mp4','mov','avi','mkv'], []);
   const acceptedExtensions = '.mp3,.wav,.m4a,.aac,.ogg,.mp4,.mov,.avi,.mkv';
-  const detectLanguage = (): string => {
-    const languages = ['pt-BR', 'en-US', 'es-ES'];
-    return languages[Math.floor(Math.random() * languages.length)];
-  };
-
-  const generateRandomDuration = (): string => {
-    const minutes = Math.floor(Math.random() * 15) + 1; // 1-15 minutes
-    const seconds = Math.floor(Math.random() * 60); // 0-59 seconds
-    return `${minutes}:${seconds.toString().padStart(2, '0')}`;
-  };const handleProviderChange = (provider: string, model: string) => {
+  
+  const handleProviderChange = (provider: string, model: string) => {
     setSelectedProvider(provider);
     setSelectedModel(model);
   };
+
   const handleFormatChange = (format: OutputFormat) => {
     setSelectedFormat(format);
   };
-  const transcribeAudio = async (filePath: string): Promise<{ success: boolean; text?: string; language?: string; duration?: string; error?: string }> => {
+
+  const transcribeAudio = async (filePath: string, outputFormat?: OutputFormat): Promise<{ success: boolean; text?: string; language?: string; duration?: number; error?: string }> => {
     if (!window.electronAPI || !selectedProvider || !selectedModel) {
       return { 
         success: false, 
@@ -64,7 +59,7 @@ const FileUpload: React.FC<FileUploadProps> = ({ onFilesUploaded }) => {
         filePath,
         provider: selectedProvider,
         model: selectedModel,
-        outputFormat: selectedFormat,
+        outputFormat,
       });
 
       if (result.success && result.text) {
@@ -72,7 +67,7 @@ const FileUpload: React.FC<FileUploadProps> = ({ onFilesUploaded }) => {
           success: true,
           text: result.text,
           language: result.language,
-          duration: result.duration ? formatDuration(result.duration) : undefined,
+          duration: result.duration,
         };
       } else {
         console.error('Transcription failed:', result.error);
@@ -89,11 +84,6 @@ const FileUpload: React.FC<FileUploadProps> = ({ onFilesUploaded }) => {
       };
     }
   };
-
-  const formatDuration = (durationInSeconds: number): string => {
-    const minutes = Math.floor(durationInSeconds / 60);
-    const seconds = Math.floor(durationInSeconds % 60);
-    return `${minutes}:${seconds.toString().padStart(2, '0')}`;  };
 
   const processFiles = async (files: File[]) => {
     const newProgress: UploadProgress[] = files.map(file => ({
@@ -176,8 +166,10 @@ const FileUpload: React.FC<FileUploadProps> = ({ onFilesUploaded }) => {
         )
       );
 
-      // Perform actual transcription
-      const transcriptionResult = await transcribeAudio(audioFilePath);      // Check if transcription failed
+      // Perform actual transcription using selected format
+      const transcriptionResult = await transcribeAudio(audioFilePath, selectedFormat);
+      
+      // Check if transcription failed
       if (!transcriptionResult.success) {
         console.error('Transcription failed:', transcriptionResult.error);
         
@@ -199,17 +191,22 @@ const FileUpload: React.FC<FileUploadProps> = ({ onFilesUploaded }) => {
         continue;
       }
 
-      // Simulate transcription progress for UI feedback
-      for (let progress = 0; progress <= 100; progress += 25) {
-        setUploadProgress(prev => 
-          prev.map(p => 
-            p.fileId === progressItem.fileId 
-              ? { ...p, progress }
-              : p
-          )
-        );
-        await new Promise(resolve => setTimeout(resolve, 300));
-      }
+      // Format duration for display
+      const formatDurationDisplay = (seconds: number): string => {
+        const mins = Math.floor(seconds / 60);
+        const secs = Math.floor(seconds % 60);
+        return `${mins}:${secs.toString().padStart(2, '0')}`;
+      };
+
+      // Create transcription entry
+      const transcriptionEntry: TranscriptionEntry = {
+        id: crypto.randomUUID(),
+        format: selectedFormat,
+        content: transcriptionResult.text || '',
+        createdAt: new Date(),
+        language: transcriptionResult.language || 'pt-BR',
+        duration: transcriptionResult.duration,
+      };
 
       // Complete processing
       const transcriptionFile: TranscriptionFile = {
@@ -217,12 +214,14 @@ const FileUpload: React.FC<FileUploadProps> = ({ onFilesUploaded }) => {
         name: file.name,
         size: file.size,
         type: file.type,
-        content: transcriptionResult.text || '',
-        language: transcriptionResult.language || detectLanguage(),
-        duration: transcriptionResult.duration || generateRandomDuration(),
+        transcriptions: [transcriptionEntry],
+        activeFormat: selectedFormat,
+        language: transcriptionResult.language || 'pt-BR',
+        duration: transcriptionResult.duration ? formatDurationDisplay(transcriptionResult.duration) : undefined,
         uploadedAt: new Date(),
         originalPath: file.name,
         convertedPath,
+        audioPath: convertedPath,
         isConverted,
         transcriptionProvider: selectedProvider || undefined,
         transcriptionModel: selectedModel || undefined,

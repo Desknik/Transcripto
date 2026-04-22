@@ -16,9 +16,11 @@ const GroupHeader: React.FC<GroupHeaderProps> = ({ group, onUpdateName, onDelete
 
   const copyAllTranscriptions = async () => {
     try {
-      // Ordena os arquivos pela ordem que aparecem no grupo e concatena as transcrições
       const allTranscriptions = group.files
-        .map((file, index) => `=== Transcrição ${index + 1}: ${file.name} ===\n\n${file.content}`)
+        .map((file, index) => {
+          const activeTranscription = file.transcriptions.find(t => t.format === file.activeFormat) || file.transcriptions[0];
+          return `=== Transcrição ${index + 1}: ${file.name} ===\n\n${activeTranscription?.content || 'Sem conteúdo'}`;
+        })
         .join('\n\n---\n\n');
       
       await navigator.clipboard.writeText(allTranscriptions);

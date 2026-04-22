@@ -124,21 +124,18 @@ ipcMain.handle('convert-audio', async (_, filePath: string) => {
   }
 })
 
-ipcMain.handle('save-file-dialog', async () => {
+ipcMain.handle('save-file-dialog', async (_, options?: { filters?: { name: string; extensions: string[] }[]; defaultPath?: string }) => {
   const result = await dialog.showSaveDialog(win!, {
-    filters: [{ name: 'MP3 Files', extensions: ['mp3'] }],
-    defaultPath: 'converted_audio.mp3'
+    filters: options?.filters || [{ name: 'All Files', extensions: ['*'] }],
+    defaultPath: options?.defaultPath || 'transcription.txt'
   })
   return result
 })
 
 ipcMain.handle('save-file-to-disk', async (_, fileBuffer: Buffer, fileName: string) => {
   try {
-    const tempDir = os.tmpdir()
-    const tempFilePath = path.join(tempDir, fileName)
-    
-    await fs.promises.writeFile(tempFilePath, fileBuffer)
-    return { success: true, filePath: tempFilePath }
+    await fs.promises.writeFile(fileName, fileBuffer)
+    return { success: true, filePath: fileName }
   } catch (error) {
     console.error('Error saving file to disk:', error)
     return { success: false, error: error instanceof Error ? error.message : 'Unknown error' }

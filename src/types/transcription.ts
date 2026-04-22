@@ -12,6 +12,15 @@ export interface TranscriptionModel {
 
 export type OutputFormat = 'json' | 'text' | 'srt' | 'verbose_json' | 'vtt';
 
+export interface TranscriptionEntry {
+  id: string;
+  format: OutputFormat;
+  content: string;
+  createdAt: Date;
+  language?: string;
+  duration?: number;
+}
+
 export interface TranscriptionRequest {
   filePath: string;
   provider: string;
@@ -27,3 +36,19 @@ export interface TranscriptionResponse {
   language?: string;
   duration?: number;
 }
+
+export const FORMAT_LABELS: Record<OutputFormat, string> = {
+  text: 'Texto',
+  srt: 'SRT',
+  vtt: 'VTT',
+  json: 'JSON',
+  verbose_json: 'JSON Completo',
+};
+
+export const FORMAT_EXTENSIONS: Record<OutputFormat, string> = {
+  text: 'txt',
+  srt: 'srt',
+  vtt: 'vtt',
+  json: 'json',
+  verbose_json: 'json',
+};

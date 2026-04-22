@@ -20,7 +20,7 @@ electron.contextBridge.exposeInMainWorld("ipcRenderer", {
 });
 electron.contextBridge.exposeInMainWorld("electronAPI", {
   convertAudio: (filePath) => electron.ipcRenderer.invoke("convert-audio", filePath),
-  saveFileDialog: () => electron.ipcRenderer.invoke("save-file-dialog"),
+  saveFileDialog: (options) => electron.ipcRenderer.invoke("save-file-dialog", options),
   saveFileToDisk: (fileBuffer, fileName) => electron.ipcRenderer.invoke("save-file-to-disk", Buffer.from(fileBuffer), fileName),
   copyFile: (sourcePath, targetPath) => electron.ipcRenderer.invoke("copy-file", sourcePath, targetPath),
   // Transcription APIs

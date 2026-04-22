@@ -23,7 +23,7 @@ contextBridge.exposeInMainWorld('ipcRenderer', {
 // Expose audio conversion APIs
 contextBridge.exposeInMainWorld('electronAPI', {
   convertAudio: (filePath: string) => ipcRenderer.invoke('convert-audio', filePath),
-  saveFileDialog: () => ipcRenderer.invoke('save-file-dialog'),
+  saveFileDialog: (options?: { filters?: { name: string; extensions: string[] }[]; defaultPath?: string }) => ipcRenderer.invoke('save-file-dialog', options),
   saveFileToDisk: (fileBuffer: ArrayBuffer, fileName: string) => 
     ipcRenderer.invoke('save-file-to-disk', Buffer.from(fileBuffer), fileName),
   copyFile: (sourcePath: string, targetPath: string) => 
