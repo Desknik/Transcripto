@@ -7,7 +7,7 @@ export interface ElectronAPI {
     outputPath?: string;
     error?: string;
   }>;
-  saveFileDialog: () => Promise<{
+  saveFileDialog: (options?: { filters?: { name: string; extensions: string[] }[]; defaultPath?: string }) => Promise<{
     canceled: boolean;
     filePath?: string;
   }>;
@@ -20,13 +20,18 @@ export interface ElectronAPI {
     success: boolean;
     error?: string;
   }>;
+  splitAudio: (filePath: string, chunkDurationSeconds: number) => Promise<{
+    success: boolean;
+    chunks: string[];
+    error?: string;
+  }>;
   getTranscriptionProviders: () => Promise<{
     success: boolean;
     providers?: TranscriptionProvider[];
     error?: string;
   }>;
   transcribeAudio: (request: TranscriptionRequest) => Promise<TranscriptionResponse>;
-  
+
   // Store APIs
   storeGet: (key: string) => Promise<{
     success: boolean;

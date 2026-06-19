@@ -29,6 +29,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
   copyFile: (sourcePath: string, targetPath: string) => 
     ipcRenderer.invoke('copy-file', sourcePath, targetPath),
   
+  // Audio splitting
+  splitAudio: (filePath: string, chunkDurationSeconds: number) =>
+    ipcRenderer.invoke('split-audio', filePath, chunkDurationSeconds),
+
   // Transcription APIs
   getTranscriptionProviders: () => ipcRenderer.invoke('get-transcription-providers'),
   transcribeAudio: (request: any) => ipcRenderer.invoke('transcribe-audio', request),

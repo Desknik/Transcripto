@@ -36,7 +36,7 @@ export interface UploadProgress {
   fileId: string;
   fileName: string;
   progress: number;
-  status: 'uploading' | 'converting' | 'transcribing' | 'completed' | 'error';
+  status: 'uploading' | 'converting' | 'queued' | 'transcribing' | 'completed' | 'error';
   errorMessage?: string;
 }
 

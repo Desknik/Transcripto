@@ -53,6 +53,54 @@ async function convertToMp3(inputPath: string, outputDir: string): Promise<strin
   })
 }
 
+// Split audio into fixed-duration MP3 chunks using ffmpeg segment muxer.
+// Returns sorted list of chunk file paths. Single-element array means no splitting occurred.
+// MP3 inputs use stream copy (-c copy) to avoid unnecessary re-encoding.
+// Video and other audio formats strip the video stream and encode audio to MP3.
+async function splitAudioIntoChunks(
+  inputPath: string,
+  chunkDurationSeconds: number,
+  outputDir: string
+): Promise<string[]> {
+  return new Promise((resolve, reject) => {
+    const prefix = `split_${Date.now()}`
+    const pattern = path.join(outputDir, `${prefix}_%03d.mp3`)
+    const isMp3 = path.extname(inputPath).toLowerCase() === '.mp3'
+
+    const outputOptions = isMp3
+      ? [
+          '-c copy',
+          '-f segment',
+          `-segment_time ${chunkDurationSeconds}`,
+        ]
+      : [
+          '-vn',
+          '-c:a libmp3lame',
+          '-b:a 93k',
+          '-f segment',
+          `-segment_time ${chunkDurationSeconds}`,
+          '-reset_timestamps 1',
+        ]
+
+    ffmpeg(inputPath)
+      .outputOptions(outputOptions)
+      .output(pattern)
+      .on('end', () => {
+        const chunks = fs.readdirSync(outputDir)
+          .filter(f => f.startsWith(`${prefix}_`) && f.endsWith('.mp3'))
+          .sort()
+          .map(f => path.join(outputDir, f))
+        console.log(`Split into ${chunks.length} chunk(s)`)
+        resolve(chunks)
+      })
+      .on('error', (err) => {
+        console.error('Error splitting audio:', err)
+        reject(err)
+      })
+      .run()
+  })
+}
+
 // The built directory structure
 //
 // ├─┬─┬ dist
@@ -169,6 +217,21 @@ ipcMain.handle('copy-file', async (_, sourcePath: string, targetPath: string) =>
   } catch (error) {
     console.error('Error copying file:', error)
     return { success: false, error: error instanceof Error ? error.message : 'Unknown error' }
+  }
+})
+
+ipcMain.handle('split-audio', async (_, filePath: string, chunkDurationSeconds: number) => {
+  try {
+    const tempDir = os.tmpdir()
+    const chunks = await splitAudioIntoChunks(filePath, chunkDurationSeconds, tempDir)
+    return { success: true, chunks }
+  } catch (error) {
+    console.error('Split audio error:', error)
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error',
+      chunks: [] as string[]
+    }
   }
 })
 

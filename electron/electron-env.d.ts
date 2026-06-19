@@ -29,6 +29,11 @@ interface Window {
     saveFileDialog: (options?: { filters?: { name: string; extensions: string[] }[]; defaultPath?: string }) => Promise<{ canceled: boolean; filePath?: string }>;
     saveFileToDisk: (fileBuffer: ArrayBuffer, fileName: string) => Promise<{ success: boolean; filePath?: string; error?: string }>;
     copyFile: (sourcePath: string, targetPath: string) => Promise<any>;
+    splitAudio: (filePath: string, chunkDurationSeconds: number) => Promise<{
+      success: boolean;
+      chunks: string[];
+      error?: string;
+    }>;
     getTranscriptionProviders: () => Promise<any>;
     transcribeAudio: (request: any) => Promise<any>;
     storeGet: (key: string) => Promise<any>;
