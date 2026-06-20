@@ -35,7 +35,12 @@ function App() {
     } else {
       const newGroup: TranscriptionGroup = {
         id: crypto.randomUUID(),
-        name: `Transcrição ${new Date().toLocaleDateString('pt-BR')} - ${new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`,
+        name: (() => {
+          const firstName = [...files].sort((a, b) => a.name.localeCompare(b.name))[0]?.name ?? '';
+          const m = firstName.match(/(\d{4})-(\d{2})-(\d{2})[_ ](\d{2})[-:](\d{2})/);
+          if (m) return `Transcrição ${m[3]}/${m[2]}/${m[1]} ${m[4]}:${m[5]}`;
+          return `Transcrição ${new Date().toLocaleDateString('pt-BR')} - ${new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`;
+        })(),
         files,
         createdAt: new Date()
       };
