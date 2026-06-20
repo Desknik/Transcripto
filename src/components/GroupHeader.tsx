@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Calendar, FileText, Folder, Copy, Check, Trash2 } from 'lucide-react';
+import { Calendar, FileText, Folder, Copy, Check, Trash2, Download } from 'lucide-react';
 import { TranscriptionGroup } from '../types';
 import EditableGroupHeader from './EditableGroupHeader';
 import ConfirmationModal from './ConfirmationModal';
@@ -10,25 +10,47 @@ interface GroupHeaderProps {
   onDeleteGroup?: (groupId: string) => void;
 }
 
+function normalizeFileName(name: string): string {
+  return name
+    .normalize('NFD').replace(/[̀-ͯ]/g, '') // remove diacritics
+    .replace(/[<>:"/\\|?*\x00-\x1f]/g, '_')          // Windows/Linux forbidden chars
+    .replace(/\s+/g, '_')
+    .replace(/_+/g, '_')
+    .replace(/^[._]+|[._]+$/g, '')                    // no leading/trailing dots or underscores
+    .slice(0, 200) || 'transcricao';
+}
+
 const GroupHeader: React.FC<GroupHeaderProps> = ({ group, onUpdateName, onDeleteGroup }) => {
   const [copiedAll, setCopiedAll] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
 
+  const buildAllTranscriptions = () =>
+    group.files
+      .map((file, index) => {
+        const active = file.transcriptions.find(t => t.format === file.activeFormat) || file.transcriptions[0];
+        return `=== Transcrição ${index + 1}: ${file.name} ===\n\n${active?.content || 'Sem conteúdo'}`;
+      })
+      .join('\n\n---\n\n');
+
   const copyAllTranscriptions = async () => {
     try {
-      const allTranscriptions = group.files
-        .map((file, index) => {
-          const activeTranscription = file.transcriptions.find(t => t.format === file.activeFormat) || file.transcriptions[0];
-          return `=== Transcrição ${index + 1}: ${file.name} ===\n\n${activeTranscription?.content || 'Sem conteúdo'}`;
-        })
-        .join('\n\n---\n\n');
-      
-      await navigator.clipboard.writeText(allTranscriptions);
+      await navigator.clipboard.writeText(buildAllTranscriptions());
       setCopiedAll(true);
       setTimeout(() => setCopiedAll(false), 2000);
     } catch (err) {
       console.error('Erro ao copiar todas as transcrições:', err);
     }
+  };
+
+  const downloadAllTranscriptions = () => {
+    const content = buildAllTranscriptions();
+    const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${normalizeFileName(group.name)}.txt`;
+    a.click();
+    URL.revokeObjectURL(url);
   };
   const formatDate = (date: Date) => {
     return date.toLocaleDateString('pt-BR', {
@@ -94,6 +116,14 @@ const GroupHeader: React.FC<GroupHeaderProps> = ({ group, onUpdateName, onDelete
                 <span>Copiar Todas</span>
               </>
             )}
+          </button>
+
+          <button
+            onClick={downloadAllTranscriptions}
+            className="flex items-center space-x-2 px-4 py-2 text-sm font-medium text-gray-700 bg-gray-50 border border-gray-200 rounded-lg hover:bg-gray-100 transition-colors"
+          >
+            <Download className="w-4 h-4" />
+            <span>Baixar Transcrição</span>
           </button>
 
           {/* Botão Excluir Grupo */}
