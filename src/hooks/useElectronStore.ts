@@ -216,6 +216,21 @@ export const useElectronStore = () => {
     }
   }, [groups, saveGroups, selectedGroupId, saveSelectedGroupId, saveSelectedFileId]);
 
+  // Add a single file to an existing group (functional update — safe in async callbacks)
+  const addFileToGroup = useCallback((groupId: string, file: import('../types').TranscriptionFile) => {
+    setGroups(prev => {
+      const updated = prev.map(group =>
+        group.id === groupId
+          ? { ...group, files: [...group.files, file] }
+          : group
+      );
+      if (window.electronAPI) {
+        window.electronAPI.storeSet('groups', updated).catch(console.error);
+      }
+      return updated;
+    });
+  }, []);
+
   // Clear all data
   const clearStore = useCallback(async () => {
     if (window.electronAPI) {
@@ -245,6 +260,7 @@ export const useElectronStore = () => {
     reorderGroups,
     reorderFilesInGroup,
     moveFileBetweenGroups,
+    addFileToGroup,
     clearStore,
     deleteGroup,
     deleteFile

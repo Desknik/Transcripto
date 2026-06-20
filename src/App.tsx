@@ -6,6 +6,14 @@ import GroupHeader from './components/GroupHeader';
 import { TranscriptionFile, TranscriptionGroup } from './types';
 import { OutputFormat, TranscriptionEntry } from './types/transcription';
 import { useElectronStore } from './hooks/useElectronStore';
+import { useProcessingQueue } from './hooks/useProcessingQueue';
+
+function deriveGroupName(files: File[]): string {
+  const firstName = [...files].sort((a, b) => a.name.localeCompare(b.name))[0]?.name ?? '';
+  const m = firstName.match(/(\d{4})-(\d{2})-(\d{2})[_ ](\d{2})[-:](\d{2})/);
+  if (m) return `Transcrição ${m[3]}/${m[2]}/${m[1]} ${m[4]}:${m[5]}`;
+  return `Transcrição ${new Date().toLocaleDateString('pt-BR')} - ${new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`;
+}
 
 function App() {
   const {
@@ -15,6 +23,7 @@ function App() {
     saveGroups,
     saveSelectedFileId,
     saveSelectedGroupId,
+    addFileToGroup,
     updateGroupName,
     updateFileName,
     deleteGroup,
@@ -24,33 +33,54 @@ function App() {
     moveFileBetweenGroups
   } = useElectronStore();
 
-  const handleFilesUploaded = async (files: TranscriptionFile[], groupId?: string) => {
-    if (groupId) {
-      const updatedGroups = groups.map(group => 
-        group.id === groupId 
-          ? { ...group, files: [...group.files, ...files] }
-          : group
-      );
-      await saveGroups(updatedGroups);
-    } else {
-      const newGroup: TranscriptionGroup = {
-        id: crypto.randomUUID(),
-        name: (() => {
-          const firstName = [...files].sort((a, b) => a.name.localeCompare(b.name))[0]?.name ?? '';
-          const m = firstName.match(/(\d{4})-(\d{2})-(\d{2})[_ ](\d{2})[-:](\d{2})/);
-          if (m) return `Transcrição ${m[3]}/${m[2]}/${m[1]} ${m[4]}:${m[5]}`;
-          return `Transcrição ${new Date().toLocaleDateString('pt-BR')} - ${new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`;
-        })(),
-        files,
-        createdAt: new Date()
-      };
+  const { batches, enqueue, dismissBatch, dismissItem } = useProcessingQueue();
 
+  const handleFilesSelected = async (
+    files: File[],
+    provider: string,
+    model: string,
+    format: OutputFormat,
+  ) => {
+    const targetGroupId = selectedGroupId;
+
+    if (targetGroupId) {
+      // Add to existing group — no new group created
+      enqueue({
+        files,
+        provider,
+        model,
+        format,
+        onFileComplete: (file: TranscriptionFile) => {
+          addFileToGroup(targetGroupId, file);
+        },
+      });
+    } else {
+      // Create the group immediately with an empty file list
+      const groupId = crypto.randomUUID();
+      const newGroup: TranscriptionGroup = {
+        id: groupId,
+        name: deriveGroupName(files),
+        files: [],
+        createdAt: new Date(),
+      };
       await saveGroups([newGroup, ...groups]);
-      await saveSelectedGroupId(newGroup.id);
-    }
-    
-    if (files.length > 0) {
-      await saveSelectedFileId(files[0].id);
+      await saveSelectedGroupId(groupId);
+
+      let firstFileDone = false;
+      enqueue({
+        files,
+        provider,
+        model,
+        format,
+        onFileComplete: async (file: TranscriptionFile, isFirst: boolean) => {
+          addFileToGroup(groupId, file);
+          // Select the first completed file so the panel opens automatically
+          if (isFirst && !firstFileDone) {
+            firstFileDone = true;
+            await saveSelectedFileId(file.id);
+          }
+        },
+      });
     }
   };
 
@@ -180,7 +210,12 @@ function App() {
                       'Envie um ou mais arquivos de áudio ou vídeo para começar a transcrever.'
                     }
                   </p>
-                  <FileUpload onFilesUploaded={(files) => handleFilesUploaded(files, selectedGroupId || undefined)} />
+                  <FileUpload
+                    onFilesSelected={handleFilesSelected}
+                    batches={batches}
+                    onDismissBatch={dismissBatch}
+                    onDismissItem={dismissItem}
+                  />
                 </div>
               </div>
             </>
