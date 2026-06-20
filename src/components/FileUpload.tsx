@@ -5,6 +5,9 @@ import { TranscriptionEntry } from '../types/transcription';
 import TranscriptionProviderSelector from './TranscriptionProviderSelector';
 import { OutputFormat } from '../types/transcription';
 
+const MAX_CONCURRENT_TRANSCRIPTIONS = 3;
+const CHUNK_DURATION_SECONDS = 16 * 60;
+
 interface FileUploadProps {
   onFilesUploaded: (files: TranscriptionFile[], groupId?: string) => void;
 }
@@ -43,56 +46,8 @@ const FileUpload: React.FC<FileUploadProps> = ({ onFilesUploaded }) => {
     setSelectedFormat(format);
   };
 
-  const transcribeAudio = async (filePath: string, outputFormat?: OutputFormat): Promise<{ success: boolean; text?: string; language?: string; duration?: number; error?: string }> => {
-    if (!window.electronAPI || !selectedProvider || !selectedModel) {
-      return { 
-        success: false, 
-        error: 'API não disponível ou provedor de transcrição não selecionado' 
-      };
-    }
-
-    try {
-      const result = await window.electronAPI.transcribeAudio({
-        filePath,
-        provider: selectedProvider,
-        model: selectedModel,
-        outputFormat,
-      });
-
-      if (result.success && result.text) {
-        return {
-          success: true,
-          text: result.text,
-          language: result.language,
-          duration: result.duration,
-        };
-      } else {
-        console.error('Transcription failed:', result.error);
-        return { 
-          success: false, 
-          error: result.error || 'Erro desconhecido na transcrição' 
-        };
-      }
-    } catch (error) {
-      console.error('Error during transcription:', error);
-      return { 
-        success: false, 
-        error: error instanceof Error ? error.message : 'Erro de conexão com o serviço de transcrição' 
-      };
-    }
-  };
-
-  // Max concurrent Whisper API calls — prevents hitting OpenAI rate limits.
-  // Increase for Tier 2+ accounts (50+ RPM).
-  const MAX_CONCURRENT_TRANSCRIPTIONS = 3;
-  const CHUNK_DURATION_SECONDS = 12 * 60; // 720 s = 12 min
-
-  const processFiles = async (files: File[]) => {
+  const processFiles = useCallback(async (files: File[]) => {
     if (!window.electronAPI) return;
-
-    // ── PHASE 1: Sequential audio extraction & splitting ────────────────────
-    // Each file is saved to disk and split into ≤12-min MP3 chunks via ffmpeg.
-    // Chunks > 12 min replace the original entry in the progress list.
 
     const initialProgress: UploadProgress[] = files.map(file => ({
       fileId: crypto.randomUUID(),
@@ -109,106 +64,10 @@ const FileUpload: React.FC<FileUploadProps> = ({ onFilesUploaded }) => {
       originalFile: File;
     }
 
-    const workQueue: WorkItem[] = [];
-
-    for (let i = 0; i < files.length; i++) {
-      const file = files[i];
-      const progressItem = initialProgress[i];
-
-      // Simulate upload read progress
-      for (let p = 0; p <= 100; p += 10) {
-        await new Promise(r => setTimeout(r, 50));
-        setUploadProgress(prev =>
-          prev.map(x => x.fileId === progressItem.fileId ? { ...x, progress: p } : x)
-        );
-      }
-
-      setUploadProgress(prev =>
-        prev.map(x => x.fileId === progressItem.fileId
-          ? { ...x, status: 'converting', progress: 0 }
-          : x)
-      );
-
-      // Save raw file to temp disk
-      const arrayBuffer = await file.arrayBuffer();
-      const saveResult = await window.electronAPI.saveFileToDisk(arrayBuffer, file.name);
-
-      if (!saveResult.success || !saveResult.filePath) {
-        setUploadProgress(prev =>
-          prev.map(x => x.fileId === progressItem.fileId
-            ? { ...x, status: 'error', errorMessage: saveResult.error || 'Falha ao salvar arquivo' }
-            : x)
-        );
-        continue;
-      }
-
-      // Split + convert to MP3 chunks (single ffmpeg call via segment muxer)
-      const splitResult = await window.electronAPI.splitAudio(
-        saveResult.filePath,
-        CHUNK_DURATION_SECONDS
-      );
-
-      if (!splitResult.success || !splitResult.chunks.length) {
-        setUploadProgress(prev =>
-          prev.map(x => x.fileId === progressItem.fileId
-            ? { ...x, status: 'error', errorMessage: splitResult.error || 'Falha na conversão' }
-            : x)
-        );
-        continue;
-      }
-
-      const chunks = splitResult.chunks;
-      const baseName = file.name.replace(/\.[^/.]+$/, '');
-      const ext = file.name.includes('.') ? file.name.split('.').pop()! : 'mp4';
-
-      if (chunks.length === 1) {
-        // Short file — keep original progress entry
-        setUploadProgress(prev =>
-          prev.map(x => x.fileId === progressItem.fileId
-            ? { ...x, status: 'queued', progress: 0 }
-            : x)
-        );
-        workQueue.push({
-          fileId: progressItem.fileId,
-          displayName: file.name,
-          audioPath: chunks[0],
-          originalFile: file,
-        });
-      } else {
-        // Long file — expand original entry into numbered chunk entries
-        const chunkEntries: UploadProgress[] = chunks.map((_, idx) => ({
-          fileId: crypto.randomUUID(),
-          fileName: `${baseName}_${String(idx + 1).padStart(3, '0')}.${ext}`,
-          progress: 0,
-          status: 'queued' as const,
-        }));
-
-        setUploadProgress(prev => {
-          const pos = prev.findIndex(x => x.fileId === progressItem.fileId);
-          if (pos === -1) return prev;
-          return [...prev.slice(0, pos), ...chunkEntries, ...prev.slice(pos + 1)];
-        });
-
-        chunks.forEach((chunkPath, idx) => {
-          workQueue.push({
-            fileId: chunkEntries[idx].fileId,
-            displayName: chunkEntries[idx].fileName,
-            audioPath: chunkPath,
-            originalFile: file,
-          });
-        });
-      }
-    }
-
-    // ── PHASE 2: Parallel transcription with concurrency limiter ────────────
-    // All queued chunks are sent to Whisper simultaneously, limited to
-    // MAX_CONCURRENT_TRANSCRIPTIONS in-flight at a time. 429 responses are
-    // retried with exponential back-off so rate limits are respected.
-
     const formatDuration = (s: number) =>
       `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
 
-    // Simple semaphore
+    // Semaphore — limits concurrent Whisper API calls
     let available = MAX_CONCURRENT_TRANSCRIPTIONS;
     const waiters: Array<() => void> = [];
     const acquire = () =>
@@ -219,6 +78,21 @@ const FileUpload: React.FC<FileUploadProps> = ({ onFilesUploaded }) => {
     const release = () => {
       const next = waiters.shift();
       if (next) next(); else available++;
+    };
+
+    const transcribeAudio = async (filePath: string, outputFormat?: OutputFormat) => {
+      if (!window.electronAPI || !selectedProvider || !selectedModel) {
+        return { success: false, error: 'API não disponível ou provedor de transcrição não selecionado' };
+      }
+      try {
+        const result = await window.electronAPI.transcribeAudio({ filePath, provider: selectedProvider, model: selectedModel, outputFormat });
+        if (result.success && result.text) {
+          return { success: true, text: result.text, language: result.language, duration: result.duration };
+        }
+        return { success: false, error: result.error || 'Erro desconhecido na transcrição' };
+      } catch (error) {
+        return { success: false, error: error instanceof Error ? error.message : 'Erro de conexão com o serviço de transcrição' };
+      }
     };
 
     const transcribeWithRetry = async (audioPath: string) => {
@@ -236,16 +110,17 @@ const FileUpload: React.FC<FileUploadProps> = ({ onFilesUploaded }) => {
           console.warn(`Rate limit hit, retrying in ${Math.round(delay)}ms…`);
           await new Promise(r => setTimeout(r, delay));
         } else {
-          return result; // Non-retriable error
+          return result;
         }
       }
       return { success: false, error: 'Limite de tentativas excedido' };
     };
 
     const processedFiles: TranscriptionFile[] = [];
+    const transcriptionTasks: Promise<void>[] = [];
 
-    await Promise.all(
-      workQueue.map(async item => {
+    const startTranscription = (item: WorkItem) => {
+      const task = (async () => {
         await acquire();
         try {
           setUploadProgress(prev =>
@@ -300,10 +175,100 @@ const FileUpload: React.FC<FileUploadProps> = ({ onFilesUploaded }) => {
         } finally {
           release();
         }
-      })
-    );
+      })();
+      transcriptionTasks.push(task);
+    };
+
+    // Sequential conversion — as each file is ready, transcription starts immediately
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
+      const progressItem = initialProgress[i];
+
+      // Simulate upload read progress
+      for (let p = 0; p <= 100; p += 10) {
+        await new Promise(r => setTimeout(r, 50));
+        setUploadProgress(prev =>
+          prev.map(x => x.fileId === progressItem.fileId ? { ...x, progress: p } : x)
+        );
+      }
+
+      setUploadProgress(prev =>
+        prev.map(x => x.fileId === progressItem.fileId
+          ? { ...x, status: 'converting', progress: 0 }
+          : x)
+      );
+
+      const arrayBuffer = await file.arrayBuffer();
+      const saveResult = await window.electronAPI.saveFileToDisk(arrayBuffer, file.name);
+
+      if (!saveResult.success || !saveResult.filePath) {
+        setUploadProgress(prev =>
+          prev.map(x => x.fileId === progressItem.fileId
+            ? { ...x, status: 'error', errorMessage: saveResult.error || 'Falha ao salvar arquivo' }
+            : x)
+        );
+        continue;
+      }
+
+      const splitResult = await window.electronAPI.splitAudio(
+        saveResult.filePath,
+        CHUNK_DURATION_SECONDS
+      );
+
+      if (!splitResult.success || !splitResult.chunks.length) {
+        setUploadProgress(prev =>
+          prev.map(x => x.fileId === progressItem.fileId
+            ? { ...x, status: 'error', errorMessage: splitResult.error || 'Falha na conversão' }
+            : x)
+        );
+        continue;
+      }
+
+      const chunks = splitResult.chunks;
+      const baseName = file.name.replace(/\.[^/.]+$/, '');
+      const ext = file.name.includes('.') ? file.name.split('.').pop()! : 'mp4';
+
+      if (chunks.length === 1) {
+        setUploadProgress(prev =>
+          prev.map(x => x.fileId === progressItem.fileId
+            ? { ...x, status: 'queued', progress: 0 }
+            : x)
+        );
+        startTranscription({
+          fileId: progressItem.fileId,
+          displayName: file.name,
+          audioPath: chunks[0],
+          originalFile: file,
+        });
+      } else {
+        const chunkEntries: UploadProgress[] = chunks.map((_, idx) => ({
+          fileId: crypto.randomUUID(),
+          fileName: `${baseName}_${String(idx + 1).padStart(3, '0')}.${ext}`,
+          progress: 0,
+          status: 'queued' as const,
+        }));
+
+        setUploadProgress(prev => {
+          const pos = prev.findIndex(x => x.fileId === progressItem.fileId);
+          if (pos === -1) return prev;
+          return [...prev.slice(0, pos), ...chunkEntries, ...prev.slice(pos + 1)];
+        });
+
+        chunks.forEach((chunkPath, idx) => {
+          startTranscription({
+            fileId: chunkEntries[idx].fileId,
+            displayName: chunkEntries[idx].fileName,
+            audioPath: chunkPath,
+            originalFile: file,
+          });
+        });
+      }
+    }
+
+    await Promise.all(transcriptionTasks);
 
     if (processedFiles.length > 0) {
+      processedFiles.sort((a, b) => a.name.localeCompare(b.name));
       onFilesUploaded(processedFiles);
     }
 
@@ -314,7 +279,7 @@ const FileUpload: React.FC<FileUploadProps> = ({ onFilesUploaded }) => {
         return current;
       });
     }, 100);
-  };
+  }, [selectedProvider, selectedModel, selectedFormat, onFilesUploaded]);
 
   const handleDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault();
