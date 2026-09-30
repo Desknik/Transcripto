@@ -51,7 +51,8 @@ const TranscriptionProviderSelector: React.FC<TranscriptionProviderSelectorProps
             setProviders(result.providers);
             
             if (!selectedProvider && result.providers.length > 0) {
-              const firstProvider = result.providers[0];
+              // Provedor local, quando habilitado, é o padrão
+              const firstProvider = result.providers.find(p => p.local && p.models.length > 0) ?? result.providers[0];
               const firstModel = firstProvider.models[0];
               if (firstModel) {
                 onProviderChange(firstProvider.id, firstModel.id);
