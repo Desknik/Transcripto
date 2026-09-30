@@ -36,6 +36,16 @@ interface Window {
     }>;
     getTranscriptionProviders: () => Promise<any>;
     transcribeAudio: (request: any) => Promise<any>;
+    getLocalWhisperStatus: () => Promise<{
+      success: boolean;
+      available: boolean;
+      running: boolean;
+      busy?: boolean;
+      model?: string;
+      startedByApp: boolean;
+    }>;
+    startLocalWhisper: () => Promise<{ success: boolean; error?: string }>;
+    stopLocalWhisper: () => Promise<{ success: boolean; error?: string }>;
     storeGet: (key: string) => Promise<any>;
     storeSet: (key: string, value: any) => Promise<any>;
     storeDelete: (key: string) => Promise<any>;

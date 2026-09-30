@@ -259,6 +259,41 @@ ipcMain.handle('transcribe-audio', async (_, request: any) => {
   }
 })
 
+// Local Whisper server controls (status / start / stop)
+ipcMain.handle('local-whisper-status', async () => {
+  const local = transcriptionManager.getLocalWhisper()
+  if (!local) return { success: true, available: false, running: false, startedByApp: false }
+  return { success: true, available: true, ...(await local.getServerStatus()) }
+})
+
+ipcMain.handle('local-whisper-start', async () => {
+  const local = transcriptionManager.getLocalWhisper()
+  if (!local) return { success: false, error: 'Provedor local não configurado' }
+  try {
+    await local.startServer()
+    return { success: true }
+  } catch (error) {
+    return { success: false, error: error instanceof Error ? error.message : 'Unknown error' }
+  }
+})
+
+ipcMain.handle('local-whisper-stop', async () => {
+  const local = transcriptionManager.getLocalWhisper()
+  if (!local) return { success: false, error: 'Provedor local não configurado' }
+  await local.stopServer()
+  return { success: true }
+})
+
+// Stop the local server on quit, but only if this app started it
+let quitting = false
+app.on('before-quit', (event) => {
+  const local = transcriptionManager.getLocalWhisper()
+  if (quitting || !local) return
+  event.preventDefault()
+  quitting = true
+  local.dispose().finally(() => app.quit())
+})
+
 // Store handlers
 ipcMain.handle('store-get', async (_, key: string) => {
   try {

@@ -41,6 +41,38 @@ OPENAI_API_KEY=sua_chave_api_openai_aqui
 # AWS_SECRET_ACCESS_KEY=sua_chave_secreta_aws
 ```
 
+### 2.1 Transcrição local (faster-whisper, opcional)
+
+Usa os scripts Python da pasta `poc-lvk` (venv com faster-whisper + CUDA). No `.env` do Transcripto:
+
+```env
+LOCAL_WHISPER_PYTHON=C:\DEV\IA\poc-lvk\Scripts\python.exe
+LOCAL_WHISPER_TRANSCRIBE_SCRIPT=C:\DEV\IA\poc-lvk\transcrever.py
+LOCAL_WHISPER_DIARIZE_SCRIPT=C:\DEV\IA\poc-lvk\transcrever_diarizado.py  # opcional
+LOCAL_WHISPER_AUTOSTART=true   # opcional; false = servidor só manual/botão
+```
+
+O provedor **Local** aparece no seletor com os modos *Transcrição* e *Diarizada por canal*
+(áudio mono cai na transcrição normal). Arquivos vão inteiros ao script, sem divisão em partes,
+e uma transcrição roda por vez (GPU).
+
+Porta, modelo e ociosidade ficam no `.env` da pasta dos scripts (`C:\DEV\IA\poc-lvk\.env`):
+
+```env
+WHISPER_MODEL=large-v3-turbo
+WHISPER_SERVER_PORT=8765
+WHISPER_SERVER_IDLE_MINUTES=0   # 0 = nunca desliga; >0 = minutos de ociosidade até encerrar
+```
+
+**Servidor (`whisper_server.py`)** mantém o modelo carregado na GPU. Os scripts verificam se ele está
+no ar: se estiver, delegam o job a ele (sem abrir nem fechar nada); se não, carregam o modelo,
+processam e descarregam. O servidor pode ser iniciado:
+- manualmente, com `iniciar-servidor.bat` (ou `python whisper_server.py`);
+- pelo botão "Servidor" no seletor do app (aparece com o provedor Local selecionado);
+- automaticamente na primeira transcrição local (`LOCAL_WHISPER_AUTOSTART`), nunca ao abrir o app.
+
+Ao fechar o app, só é encerrado o servidor que o próprio app iniciou.
+
 ### 3. Executar o Projeto
 
 ```bash

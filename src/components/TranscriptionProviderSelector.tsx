@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { ChevronDown, Cpu, FileText } from 'lucide-react';
+import { ChevronDown, Cpu, FileText, Power } from 'lucide-react';
 import { TranscriptionProvider, TranscriptionModel, OutputFormat, FORMAT_LABELS } from '../types/transcription';
 
 interface TranscriptionProviderSelectorProps {
@@ -23,6 +23,8 @@ const TranscriptionProviderSelector: React.FC<TranscriptionProviderSelectorProps
   const [modelOpen, setModelOpen] = useState(false);
   const [formatOpen, setFormatOpen] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [server, setServer] = useState<{ running: boolean; busy?: boolean } | null>(null);
+  const [serverBusy, setServerBusy] = useState(false);
   const modelRef = useRef<HTMLDivElement>(null);
   const formatRef = useRef<HTMLDivElement>(null);
 
@@ -66,6 +68,34 @@ const TranscriptionProviderSelector: React.FC<TranscriptionProviderSelectorProps
 
     loadProviders();
   }, [selectedProvider, onProviderChange]);
+
+  const isLocalSelected = providers.find(p => p.id === selectedProvider)?.local === true;
+
+  // Estado do servidor local (só consulta enquanto o provedor local está selecionado)
+  useEffect(() => {
+    if (!isLocalSelected || !window.electronAPI) { setServer(null); return; }
+    let active = true;
+    const poll = async () => {
+      const s = await window.electronAPI.getLocalWhisperStatus();
+      if (active) setServer(s.available ? { running: s.running, busy: s.busy } : null);
+    };
+    poll();
+    const timer = setInterval(poll, 3000);
+    return () => { active = false; clearInterval(timer); };
+  }, [isLocalSelected]);
+
+  const toggleServer = async () => {
+    if (!server || serverBusy) return;
+    setServerBusy(true);
+    try {
+      if (server.running) await window.electronAPI.stopLocalWhisper();
+      else await window.electronAPI.startLocalWhisper();
+      const s = await window.electronAPI.getLocalWhisperStatus();
+      setServer(s.available ? { running: s.running, busy: s.busy } : null);
+    } finally {
+      setServerBusy(false);
+    }
+  };
 
   const handleModelSelection = (provider: TranscriptionProvider, model: TranscriptionModel) => {
     onProviderChange(provider.id, model.id);
@@ -185,6 +215,26 @@ const TranscriptionProviderSelector: React.FC<TranscriptionProviderSelectorProps
           </div>
         )}
       </div>
+
+      {isLocalSelected && server && (
+        <button
+          className={`flex items-center space-x-2 px-3 py-1.5 border rounded-lg transition-colors text-xs disabled:opacity-60 ${
+            server.running
+              ? 'border-green-200 bg-green-50 hover:bg-green-100 text-green-700'
+              : 'border-gray-200 bg-gray-50 hover:bg-gray-100 text-gray-600'
+          }`}
+          onClick={toggleServer}
+          disabled={serverBusy}
+          title={server.running
+            ? 'Modelo carregado na GPU. Clique para descarregar.'
+            : 'Sem servidor: o modelo é carregado ao transcrever. Clique para carregar agora.'}
+        >
+          <Power className="w-3.5 h-3.5" />
+          <span className="font-medium">
+            {serverBusy ? 'Aguarde...' : server.running ? (server.busy ? 'Servidor ativo (processando)' : 'Servidor ativo') : 'Servidor parado'}
+          </span>
+        </button>
+      )}
     </div>
   );
 };

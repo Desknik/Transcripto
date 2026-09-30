@@ -1,9 +1,15 @@
 import { BaseTranscriptionService } from './base';
 import { OpenAITranscriptionService } from './openai';
-import { TranscriptionProvider, TranscriptionRequest, TranscriptionResponse } from '../../types/transcription';
+import { LocalWhisperTranscriptionService, resolveLocalWhisperConfig } from './localWhisper';
+import { TranscriptionProvider, TranscriptionRequest, TranscriptionResponse, LOCAL_WHISPER_PROVIDER_ID } from '../../types/transcription';
 
 export class TranscriptionServiceManager {
   private services: Map<string, BaseTranscriptionService> = new Map();
+  private localWhisper: LocalWhisperTranscriptionService | null = null;
+
+  getLocalWhisper(): LocalWhisperTranscriptionService | null {
+    return this.localWhisper;
+  }
 
   constructor() {
     // Initialize services with API keys
@@ -19,6 +25,13 @@ export class TranscriptionServiceManager {
         openaiKey.trim() !== '' && 
         openaiKey.startsWith('sk-')) {
       this.services.set('openai', new OpenAITranscriptionService(openaiKey));
+    }
+
+    // Local faster-whisper (scripts Python indicados no .env)
+    const localConfig = resolveLocalWhisperConfig();
+    if (localConfig) {
+      this.localWhisper = new LocalWhisperTranscriptionService(localConfig);
+      this.services.set(LOCAL_WHISPER_PROVIDER_ID, this.localWhisper);
     }
 
     // Future providers can be added here:

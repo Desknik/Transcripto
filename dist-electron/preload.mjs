@@ -23,9 +23,15 @@ electron.contextBridge.exposeInMainWorld("electronAPI", {
   saveFileDialog: (options) => electron.ipcRenderer.invoke("save-file-dialog", options),
   saveFileToDisk: (fileBuffer, fileName) => electron.ipcRenderer.invoke("save-file-to-disk", Buffer.from(fileBuffer), fileName),
   copyFile: (sourcePath, targetPath) => electron.ipcRenderer.invoke("copy-file", sourcePath, targetPath),
+  // Audio splitting
+  splitAudio: (filePath, chunkDurationSeconds) => electron.ipcRenderer.invoke("split-audio", filePath, chunkDurationSeconds),
   // Transcription APIs
   getTranscriptionProviders: () => electron.ipcRenderer.invoke("get-transcription-providers"),
   transcribeAudio: (request) => electron.ipcRenderer.invoke("transcribe-audio", request),
+  // Local Whisper server
+  getLocalWhisperStatus: () => electron.ipcRenderer.invoke("local-whisper-status"),
+  startLocalWhisper: () => electron.ipcRenderer.invoke("local-whisper-start"),
+  stopLocalWhisper: () => electron.ipcRenderer.invoke("local-whisper-stop"),
   // Store APIs
   storeGet: (key) => electron.ipcRenderer.invoke("store-get", key),
   storeSet: (key, value) => electron.ipcRenderer.invoke("store-set", key, value),

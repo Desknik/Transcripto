@@ -37,6 +37,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
   getTranscriptionProviders: () => ipcRenderer.invoke('get-transcription-providers'),
   transcribeAudio: (request: any) => ipcRenderer.invoke('transcribe-audio', request),
   
+  // Local Whisper server
+  getLocalWhisperStatus: () => ipcRenderer.invoke('local-whisper-status'),
+  startLocalWhisper: () => ipcRenderer.invoke('local-whisper-start'),
+  stopLocalWhisper: () => ipcRenderer.invoke('local-whisper-stop'),
+
   // Store APIs
   storeGet: (key: string) => ipcRenderer.invoke('store-get', key),
   storeSet: (key: string, value: any) => ipcRenderer.invoke('store-set', key, value),

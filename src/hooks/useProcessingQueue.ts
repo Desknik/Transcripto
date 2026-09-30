@@ -1,8 +1,10 @@
 import { useState, useRef, useCallback } from 'react';
 import { TranscriptionFile, UploadProgress } from '../types';
-import { OutputFormat, TranscriptionEntry } from '../types/transcription';
+import { OutputFormat, TranscriptionEntry, LOCAL_WHISPER_PROVIDER_ID } from '../types/transcription';
 
 const MAX_CONCURRENT_TRANSCRIPTIONS = 3;
+// Provedor local usa a GPU: uma transcrição por vez
+const MAX_CONCURRENT_LOCAL_TRANSCRIPTIONS = 1;
 const CHUNK_DURATION_SECONDS = 16 * 60;
 
 export interface BatchProgress {
@@ -24,19 +26,19 @@ export function useProcessingQueue() {
   // Global conversion mutex — ensures only one ffmpeg process at a time across all batches
   const conversionTail = useRef(Promise.resolve());
 
-  // Global transcription semaphore — shared across all batches
-  const txSlots = useRef(MAX_CONCURRENT_TRANSCRIPTIONS);
-  const txWaiters = useRef<Array<() => void>>([]);
+  // Global transcription semaphores — shared across all batches, one per kind (cloud / local GPU)
+  const txSlots = useRef({ cloud: MAX_CONCURRENT_TRANSCRIPTIONS, local: MAX_CONCURRENT_LOCAL_TRANSCRIPTIONS });
+  const txWaiters = useRef<{ cloud: Array<() => void>; local: Array<() => void> }>({ cloud: [], local: [] });
 
-  const acquireTx = useCallback((): Promise<void> =>
+  const acquireTx = useCallback((kind: 'cloud' | 'local'): Promise<void> =>
     new Promise(resolve => {
-      if (txSlots.current > 0) { txSlots.current--; resolve(); }
-      else txWaiters.current.push(resolve);
+      if (txSlots.current[kind] > 0) { txSlots.current[kind]--; resolve(); }
+      else txWaiters.current[kind].push(resolve);
     }), []);
 
-  const releaseTx = useCallback(() => {
-    const next = txWaiters.current.shift();
-    if (next) next(); else txSlots.current++;
+  const releaseTx = useCallback((kind: 'cloud' | 'local') => {
+    const next = txWaiters.current[kind].shift();
+    if (next) next(); else txSlots.current[kind]++;
   }, []);
 
   const updateItem = useCallback((batchId: string, fileId: string, update: Partial<UploadProgress>) => {
@@ -59,6 +61,8 @@ export function useProcessingQueue() {
 
   const enqueue = useCallback(({ files, provider, model, format, onFileComplete }: EnqueueOptions) => {
     const batchId = crypto.randomUUID();
+    const isLocal = provider === LOCAL_WHISPER_PROVIDER_ID;
+    const txKind = isLocal ? 'local' : 'cloud';
     const initialItems: UploadProgress[] = files.map(file => ({
       fileId: crypto.randomUUID(),
       fileName: file.name,
@@ -108,7 +112,7 @@ export function useProcessingQueue() {
 
       const startTranscription = (item: WorkItem) => {
         tasks.push((async () => {
-          await acquireTx();
+          await acquireTx(txKind);
           try {
             updateItem(batchId, item.fileId, { status: 'transcribing', progress: 0 });
             const result = await transcribeWithRetry(item.audioPath);
@@ -146,7 +150,7 @@ export function useProcessingQueue() {
             onFileComplete(tf, isFirst);
             updateItem(batchId, item.fileId, { status: 'completed', progress: 100 });
           } finally {
-            releaseTx();
+            releaseTx(txKind);
           }
         })());
       };
@@ -179,6 +183,13 @@ export function useProcessingQueue() {
           const saveResult = await window.electronAPI.saveFileToDisk(arrayBuffer, file.name);
           if (!saveResult.success || !saveResult.filePath) {
             updateItem(batchId, progressItem.fileId, { status: 'error', errorMessage: saveResult.error || 'Falha ao salvar arquivo' });
+            continue;
+          }
+
+          // Provedor local lida com arquivos grandes: envia o arquivo original inteiro, sem dividir
+          if (isLocal) {
+            updateItem(batchId, progressItem.fileId, { status: 'queued', progress: 0 });
+            startTranscription({ fileId: progressItem.fileId, displayName: file.name, audioPath: saveResult.filePath, originalFile: file });
             continue;
           }
 

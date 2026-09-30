@@ -1,7 +1,11 @@
+export const LOCAL_WHISPER_PROVIDER_ID = 'local-whisper';
+
 export interface TranscriptionProvider {
   id: string;
   name: string;
   models: TranscriptionModel[];
+  /** Provedor local (GPU): sem divisão de arquivo e com uma transcrição por vez */
+  local?: boolean;
 }
 
 export interface TranscriptionModel {
