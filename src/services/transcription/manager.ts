@@ -1,53 +1,52 @@
 import { BaseTranscriptionService } from './base';
 import { OpenAITranscriptionService } from './openai';
-import { LocalWhisperTranscriptionService, resolveLocalWhisperConfig } from './localWhisper';
+import { LocalWhisperTranscriptionService, LocalWhisperConfig } from './localWhisper';
 import { TranscriptionProvider, TranscriptionRequest, TranscriptionResponse, LOCAL_WHISPER_PROVIDER_ID } from '../../types/transcription';
 
-export class TranscriptionServiceManager {
-  private services: Map<string, BaseTranscriptionService> = new Map();
-  private localWhisper: LocalWhisperTranscriptionService | null = null;
+export interface ManagerDeps {
+  /** Config do motor local; o provedor local só existe com o motor instalado e o modelo escolhido baixado */
+  localConfig: LocalWhisperConfig;
+  isLocalReady: () => Promise<boolean>;
+  getOpenAIKey: () => string | null;
+  /** Idioma configurado, para requisições que não trazem o seu ('auto' → undefined) */
+  getLanguage: () => string | undefined;
+}
 
-  getLocalWhisper(): LocalWhisperTranscriptionService | null {
+export class TranscriptionServiceManager {
+  private readonly localWhisper: LocalWhisperTranscriptionService;
+  private openai: { key: string; service: OpenAITranscriptionService } | null = null;
+
+  constructor(private readonly deps: ManagerDeps) {
+    this.localWhisper = new LocalWhisperTranscriptionService(deps.localConfig);
+  }
+
+  getLocalWhisper(): LocalWhisperTranscriptionService {
     return this.localWhisper;
   }
 
-  constructor() {
-    // Initialize services with API keys
-    this.initializeServices();
+  /** Recriado só quando a chave muda; configurações podem mudar a qualquer momento. */
+  private getOpenAI(): OpenAITranscriptionService | null {
+    const key = this.deps.getOpenAIKey();
+    if (!key) { this.openai = null; return null; }
+    if (this.openai?.key !== key) this.openai = { key, service: new OpenAITranscriptionService(key) };
+    return this.openai.service;
   }
 
-  private initializeServices(): void {
-    // For now, we'll get API keys from environment variables
-    // In the future, this could be from user settings or database
-      const openaiKey = process.env.OPENAI_API_KEY;
-    if (openaiKey && 
-        openaiKey !== 'your_openai_api_key_here' && 
-        openaiKey.trim() !== '' && 
-        openaiKey.startsWith('sk-')) {
-      this.services.set('openai', new OpenAITranscriptionService(openaiKey));
-    }
-
-    // Local faster-whisper (scripts Python indicados no .env)
-    const localConfig = resolveLocalWhisperConfig();
-    if (localConfig) {
-      this.localWhisper = new LocalWhisperTranscriptionService(localConfig);
-      this.services.set(LOCAL_WHISPER_PROVIDER_ID, this.localWhisper);
-    }
-
-    // Future providers can be added here:
-    // const elevenlabsKey = process.env.ELEVENLABS_API_KEY;
-    // if (elevenlabsKey) {
-    //   this.services.set('elevenlabs', new ElevenLabsTranscriptionService(elevenlabsKey));
-    // }
+  private async getServices(): Promise<Map<string, BaseTranscriptionService>> {
+    const services = new Map<string, BaseTranscriptionService>();
+    if (await this.deps.isLocalReady()) services.set(LOCAL_WHISPER_PROVIDER_ID, this.localWhisper);
+    const openai = this.getOpenAI();
+    if (openai) services.set('openai', openai);
+    return services;
   }
 
-  getAvailableProviders(): TranscriptionProvider[] {
-    return Array.from(this.services.values()).map(service => service.getProvider());
+  async getAvailableProviders(): Promise<TranscriptionProvider[]> {
+    return Array.from((await this.getServices()).values()).map(service => service.getProvider());
   }
 
   async transcribe(request: TranscriptionRequest): Promise<TranscriptionResponse> {
-    const service = this.services.get(request.provider);
-    
+    const service = (await this.getServices()).get(request.provider);
+
     if (!service) {
       return {
         success: false,
@@ -55,10 +54,6 @@ export class TranscriptionServiceManager {
       };
     }
 
-    return service.transcribe(request);
-  }
-
-  isProviderAvailable(providerId: string): boolean {
-    return this.services.has(providerId);
+    return service.transcribe({ ...request, language: request.language ?? this.deps.getLanguage() });
   }
 }

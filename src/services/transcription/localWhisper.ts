@@ -2,6 +2,7 @@ import { spawn, ChildProcess } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import readline from 'node:readline';
 import { BaseTranscriptionService } from './base';
 import {
   TranscriptionProvider,
@@ -10,6 +11,9 @@ import {
   OutputFormat,
   LOCAL_WHISPER_PROVIDER_ID,
 } from '../../types/transcription';
+import { AppSettings } from '../../types/settings';
+
+export const LOCAL_SERVER_PORT = 8765;
 
 export interface LocalWhisperServerStatus {
   running: boolean;
@@ -28,57 +32,19 @@ interface LocalSegment {
 interface LocalResult {
   segments: LocalSegment[];
   duration: number;
+  language?: string;
   mode: string;
 }
 
 export interface LocalWhisperConfig {
+  /** python.exe do runtime gerenciado */
   python: string;
-  transcribeScript: string;
-  diarizeScript?: string;
-  serverScript: string;
-  autostart: boolean;
-}
-
-/** Lê KEY=VALUE do .env que fica ao lado dos scripts Python (fonte única de porta/modelo/ociosidade). */
-function readScriptEnv(scriptDir: string): Record<string, string> {
-  const values: Record<string, string> = {};
-  try {
-    const file = fs.readFileSync(path.join(scriptDir, '.env'), 'utf-8');
-    const content = file.charCodeAt(0) === 0xfeff ? file.slice(1) : file;
-    for (const raw of content.split(/\r?\n/)) {
-      const line = raw.trim();
-      if (!line || line.startsWith('#') || !line.includes('=')) continue;
-      const idx = line.indexOf('=');
-      values[line.slice(0, idx).trim()] = line.slice(idx + 1).split(' #')[0].trim().replace(/^["']|["']$/g, '');
-    }
-  } catch {
-    // .env é opcional: valem os padrões dos scripts
-  }
-  return values;
-}
-
-/** Retorna a configuração se o .env do Transcripto estiver preenchido e os arquivos existirem. */
-export function resolveLocalWhisperConfig(): LocalWhisperConfig | null {
-  const python = process.env.LOCAL_WHISPER_PYTHON?.trim();
-  const transcribeScript = process.env.LOCAL_WHISPER_TRANSCRIBE_SCRIPT?.trim();
-  if (!python || !transcribeScript) return null;
-  if (!fs.existsSync(python) || !fs.existsSync(transcribeScript)) {
-    console.warn('Local Whisper: caminho do Python ou do script não encontrado; provedor desativado');
-    return null;
-  }
-
-  const diarizeScript = process.env.LOCAL_WHISPER_DIARIZE_SCRIPT?.trim();
-  const serverScript =
-    process.env.LOCAL_WHISPER_SERVER_SCRIPT?.trim() ||
-    path.join(path.dirname(transcribeScript), 'whisper_server.py');
-
-  return {
-    python,
-    transcribeScript,
-    diarizeScript: diarizeScript && fs.existsSync(diarizeScript) ? diarizeScript : undefined,
-    serverScript,
-    autostart: (process.env.LOCAL_WHISPER_AUTOSTART ?? 'true').toLowerCase() !== 'false',
-  };
+  /** Pasta com transcriber.py e whisper_server.py */
+  scriptsDir: string;
+  modelsDir: string;
+  ffmpegPath: string;
+  /** Lido a cada uso: o usuário pode mudar modelo/idioma/dispositivo nas Configurações */
+  getSettings: () => AppSettings;
 }
 
 export class LocalWhisperTranscriptionService extends BaseTranscriptionService {
@@ -91,42 +57,45 @@ export class LocalWhisperTranscriptionService extends BaseTranscriptionService {
     super();
   }
 
-  private get scriptEnv() {
-    return readScriptEnv(path.dirname(this.cfg.transcribeScript));
-  }
-
-  private get port(): number {
-    const p = parseInt(this.scriptEnv.WHISPER_SERVER_PORT ?? '', 10);
-    return Number.isFinite(p) ? p : 8765;
-  }
-
-  private get modelName(): string {
-    return this.scriptEnv.WHISPER_MODEL || 'large-v3-turbo';
+  /** Variáveis lidas pelo vlk_whisper.py */
+  private get scriptEnv(): NodeJS.ProcessEnv {
+    const s = this.cfg.getSettings();
+    return {
+      ...process.env,
+      PYTHONIOENCODING: 'utf-8',
+      VLK_MODEL: s.whisperModel,
+      VLK_MODELS_DIR: this.cfg.modelsDir,
+      VLK_DEVICE: s.device,
+      VLK_LANGUAGE: s.language,
+      VLK_FFMPEG: this.cfg.ffmpegPath,
+      VLK_SERVER_PORT: String(LOCAL_SERVER_PORT),
+      VLK_IDLE_MINUTES: String(s.idleMinutes),
+      HF_HUB_OFFLINE: '1', // modelos são baixados pelas Configurações, nunca em silêncio durante o uso
+    };
   }
 
   getProvider(): TranscriptionProvider {
-    const models = [
-      {
-        id: 'transcricao',
-        name: `Transcrição (${this.modelName})`,
-        description: 'faster-whisper local na GPU, sem divisão de arquivo',
-      },
-    ];
-    if (this.cfg.diarizeScript) {
-      models.push({
-        id: 'diarizado',
-        name: `Diarizada por canal (${this.modelName})`,
-        description: 'Identifica locutores em áudio estéreo; mono usa a transcrição normal',
-      });
-    }
-    return { id: LOCAL_WHISPER_PROVIDER_ID, name: 'Local', local: true, models };
+    const model = this.cfg.getSettings().whisperModel;
+    return {
+      id: LOCAL_WHISPER_PROVIDER_ID,
+      name: 'Local',
+      local: true,
+      models: [
+        { id: 'transcricao', name: `Transcrição (${model})`, description: 'faster-whisper local, sem divisão de arquivo' },
+        {
+          id: 'diarizado',
+          name: `Diarizada por canal (${model})`,
+          description: 'Identifica locutores em áudio estéreo; mono usa a transcrição normal',
+        },
+      ],
+    };
   }
 
   // ------------------------------------------------------------------ servidor
 
   async getServerStatus(): Promise<LocalWhisperServerStatus> {
     try {
-      const res = await fetch(`http://127.0.0.1:${this.port}/health`, { signal: AbortSignal.timeout(1500) });
+      const res = await fetch(`http://127.0.0.1:${LOCAL_SERVER_PORT}/health`, { signal: AbortSignal.timeout(1500) });
       const data = await res.json();
       if (data?.ok) {
         return { running: true, busy: !!data.busy, model: data.model, startedByApp: this.ownedServer !== null };
@@ -137,20 +106,23 @@ export class LocalWhisperTranscriptionService extends BaseTranscriptionService {
     return { running: false, startedByApp: false };
   }
 
-  /** Inicia o servidor (carrega o modelo) e aguarda ficar pronto. Não faz nada se já estiver no ar. */
+  /** Inicia o servidor (carrega o modelo) e aguarda ficar pronto. Reinicia se estiver com outro modelo. */
   startServer(): Promise<void> {
     if (this.starting) return this.starting;
     this.starting = (async () => {
-      if ((await this.getServerStatus()).running) return;
-      if (!fs.existsSync(this.cfg.serverScript)) {
-        throw new Error(`Script do servidor não encontrado: ${this.cfg.serverScript}`);
+      const wanted = this.cfg.getSettings().whisperModel;
+      const status = await this.getServerStatus();
+      if (status.running) {
+        if (status.model === wanted) return;
+        if (!status.startedByApp) return; // servidor de terceiros: não mexe (o script cai no modo sem servidor)
+        await this.stopServer();
       }
 
-      const child = spawn(this.cfg.python, [this.cfg.serverScript], {
-        cwd: path.dirname(this.cfg.serverScript),
+      const child = spawn(this.cfg.python, ['whisper_server.py'], {
+        cwd: this.cfg.scriptsDir,
         stdio: ['ignore', 'pipe', 'pipe'],
         windowsHide: true,
-        env: { ...process.env, PYTHONIOENCODING: 'utf-8' },
+        env: this.scriptEnv,
       });
       this.ownedServer = child;
       let output = '';
@@ -177,7 +149,7 @@ export class LocalWhisperTranscriptionService extends BaseTranscriptionService {
 
   async stopServer(): Promise<void> {
     try {
-      await fetch(`http://127.0.0.1:${this.port}/shutdown`, { method: 'POST', signal: AbortSignal.timeout(3000) });
+      await fetch(`http://127.0.0.1:${LOCAL_SERVER_PORT}/shutdown`, { method: 'POST', signal: AbortSignal.timeout(3000) });
     } catch {
       this.ownedServer?.kill();
     }
@@ -201,27 +173,25 @@ export class LocalWhisperTranscriptionService extends BaseTranscriptionService {
     try {
       this.validateRequest(request);
       const diarize = request.model === 'diarizado';
-      const script = diarize ? this.cfg.diarizeScript : this.cfg.transcribeScript;
-      if (!script) return { success: false, error: 'Script de diarização não configurado (LOCAL_WHISPER_DIARIZE_SCRIPT)' };
 
-      // Opção C: sobe o servidor só quando há de fato algo para transcrever.
+      // Sobe o servidor só quando há de fato algo para transcrever.
       // Se falhar, o próprio script cai no modo "carrega, processa e descarrega".
-      if (this.cfg.autostart) {
-        try {
-          await this.startServer();
-        } catch (e) {
-          console.warn('Local Whisper: servidor não iniciou, usando modo sem servidor:', e);
-        }
+      try {
+        await this.startServer();
+      } catch (e) {
+        console.warn('Local Whisper: servidor não iniciou, usando modo sem servidor:', e);
       }
 
       const outFile = path.join(os.tmpdir(), `transcripto_local_${Date.now()}_${Math.random().toString(36).slice(2)}.json`);
       try {
-        await this.runScript(script, ['-a', request.filePath, '--json', '-o', outFile]);
+        const args = ['-a', request.filePath, '-o', outFile];
+        if (diarize) args.push('--diarize');
+        await this.runScript(args);
         const result: LocalResult = JSON.parse(fs.readFileSync(outFile, 'utf-8'));
         return {
           success: true,
           text: this.format(result, request.outputFormat || 'text'),
-          language: request.language || 'pt',
+          language: result.language || request.language,
           duration: result.duration,
         };
       } finally {
@@ -233,16 +203,16 @@ export class LocalWhisperTranscriptionService extends BaseTranscriptionService {
     }
   }
 
-  private runScript(script: string, args: string[]): Promise<void> {
+  private runScript(args: string[]): Promise<void> {
     return new Promise((resolve, reject) => {
-      const child = spawn(this.cfg.python, [script, ...args], {
-        cwd: path.dirname(script),
+      const child = spawn(this.cfg.python, ['transcriber.py', ...args], {
+        cwd: this.cfg.scriptsDir,
         windowsHide: true,
-        env: { ...process.env, PYTHONIOENCODING: 'utf-8' },
+        env: this.scriptEnv,
       });
       let stderr = '';
       child.stderr.on('data', d => { stderr = (stderr + d.toString()).slice(-4000); });
-      child.stdout.resume();
+      readline.createInterface({ input: child.stdout }).on('line', () => undefined); // eventos de progresso: ignorados por ora
       child.on('error', err => reject(new Error(`Falha ao executar o Python: ${err.message}`)));
       child.on('close', code => {
         if (code === 0) resolve();
@@ -287,7 +257,7 @@ export class LocalWhisperTranscriptionService extends BaseTranscriptionService {
       case 'verbose_json':
         return JSON.stringify({
           task: 'transcribe',
-          language: 'portuguese',
+          language: result.language ?? this.cfg.getSettings().language,
           duration: result.duration,
           text,
           segments: segs.map((s, i) => ({ id: i, ...s })),
@@ -298,8 +268,7 @@ export class LocalWhisperTranscriptionService extends BaseTranscriptionService {
   }
 
   async testConnection(): Promise<{ success: boolean; error?: string }> {
-    if (!fs.existsSync(this.cfg.python)) return { success: false, error: 'Python não encontrado' };
-    if (!fs.existsSync(this.cfg.transcribeScript)) return { success: false, error: 'Script não encontrado' };
+    if (!fs.existsSync(this.cfg.python)) return { success: false, error: 'Motor local não instalado' };
     return { success: true };
   }
 }

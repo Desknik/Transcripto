@@ -8,10 +8,11 @@
     output: "release/${version}",
   },
   files: ["dist", "dist-electron"],
-  mac: {
-    target: ["dmg"],
-    artifactName: "${productName}-Mac-${version}-Installer.${ext}",
-  },
+  // Scripts Python ficam fora do asar (o Python do usuário os executa); ffmpeg também precisa ser executável
+  extraResources: [
+    { from: "resources/python", to: "python", filter: ["*.py", "*.txt"] },
+  ],
+  asarUnpack: ["node_modules/ffmpeg-static/**"],
   win: {
     target: [
       {
@@ -26,9 +27,5 @@
     perMachine: false,
     allowToChangeInstallationDirectory: true,
     deleteAppDataOnUninstall: false,
-  },
-  linux: {
-    target: ["AppImage"],
-    artifactName: "${productName}-Linux-${version}.${ext}",
   },
 }

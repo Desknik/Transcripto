@@ -1,5 +1,6 @@
 // Types for Electron IPC API
 import { TranscriptionProvider, TranscriptionRequest, TranscriptionResponse } from './transcription';
+import { AppSettings, EngineStatus, SetupEvent } from './settings';
 
 export interface ElectronAPI {
   convertAudio: (filePath: string) => Promise<{
@@ -43,6 +44,18 @@ export interface ElectronAPI {
   }>;
   startLocalWhisper: () => Promise<{ success: boolean; error?: string }>;
   stopLocalWhisper: () => Promise<{ success: boolean; error?: string }>;
+
+  // Settings, local engine and models
+  getSettings: () => Promise<{ success: boolean; settings: AppSettings; hasOpenAIKey: boolean }>;
+  updateSettings: (patch: Partial<AppSettings>) => Promise<{ success: boolean; settings?: AppSettings; error?: string }>;
+  setOpenAIKey: (key: string | null) => Promise<{ success: boolean; hasOpenAIKey?: boolean; error?: string }>;
+  testOpenAIKey: (key?: string) => Promise<{ success: boolean; error?: string }>;
+  getEngineStatus: () => Promise<{ success: boolean; status?: EngineStatus; error?: string }>;
+  setupEngine: () => Promise<{ success: boolean; error?: string }>;
+  downloadModel: (id: string) => Promise<{ success: boolean; error?: string }>;
+  removeModel: (id: string) => Promise<{ success: boolean; error?: string }>;
+  onEngineSetupProgress: (cb: (p: SetupEvent) => void) => () => void;
+  onModelDownloadProgress: (cb: (p: { id: string; done: number; total: number }) => void) => () => void;
 
   // Store APIs
   storeGet: (key: string) => Promise<{

@@ -1,4 +1,8 @@
-import { Mic } from 'lucide-react';
+import { useCallback, useEffect, useState } from 'react';
+import { Mic, Settings as SettingsIcon } from 'lucide-react';
+import SettingsModal from './components/SettingsModal';
+import SetupWizard from './components/SetupWizard';
+import { EngineStatus, DEFAULT_SETTINGS } from './types/settings';
 import FileUpload from './components/FileUpload';
 import Sidebar from './components/Sidebar';
 import TranscriptionPanel from './components/TranscriptionPanel';
@@ -34,6 +38,22 @@ function App() {
   } = useElectronStore();
 
   const { batches, enqueue, dismissBatch, dismissItem } = useProcessingQueue();
+
+  const [showSettings, setShowSettings] = useState(false);
+  const [engine, setEngine] = useState<EngineStatus | null>(null);
+  const [modelId, setModelId] = useState(DEFAULT_SETTINGS.whisperModel);
+  const [wizardSkipped, setWizardSkipped] = useState(false);
+  // Muda quando configurações/modelos mudam, para o seletor de provedor recarregar
+  const [providersVersion, setProvidersVersion] = useState(0);
+
+  const refreshEngine = useCallback(async () => {
+    const [s, e] = await Promise.all([window.electronAPI.getSettings(), window.electronAPI.getEngineStatus()]);
+    if (s.success) setModelId(s.settings.whisperModel);
+    if (e.success && e.status) setEngine(e.status);
+    setProvidersVersion(v => v + 1);
+  }, []);
+
+  useEffect(() => { if (window.electronAPI) refreshEngine(); }, [refreshEngine]);
 
   const handleFilesSelected = async (
     files: File[],
@@ -158,6 +178,31 @@ function App() {
 
   return (
     <div className="min-h-screen bg-gray-100">
+      <button
+        onClick={() => setShowSettings(true)}
+        title="Configurações"
+        className="fixed top-3 right-3 z-30 p-2 bg-white border border-gray-200 rounded-lg shadow-sm text-gray-600 hover:text-gray-900 hover:bg-gray-50"
+      >
+        <SettingsIcon className="w-4 h-4" />
+      </button>
+
+      {engine && !engine.ready && !wizardSkipped && !showSettings && (
+        <SetupWizard
+          status={engine}
+          modelId={modelId}
+          onDone={refreshEngine}
+          onSkip={() => setWizardSkipped(true)}
+          onOpenSettings={() => setShowSettings(true)}
+        />
+      )}
+
+      {showSettings && (
+        <SettingsModal
+          onClose={() => setShowSettings(false)}
+          onChanged={refreshEngine}
+        />
+      )}
+
       <div className="flex h-screen">
         {/* Sidebar - only show if there are transcriptions */}
         {hasTranscriptions && (
@@ -211,6 +256,7 @@ function App() {
                     }
                   </p>
                   <FileUpload
+                    key={providersVersion}
                     onFilesSelected={handleFilesSelected}
                     batches={batches}
                     onDismissBatch={dismissBatch}

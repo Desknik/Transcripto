@@ -6,6 +6,7 @@ const MAX_CONCURRENT_TRANSCRIPTIONS = 3;
 // Provedor local usa a GPU: uma transcrição por vez
 const MAX_CONCURRENT_LOCAL_TRANSCRIPTIONS = 1;
 const CHUNK_DURATION_SECONDS = 16 * 60;
+const FALLBACK_PROVIDER = { provider: 'openai', model: 'whisper-1' };
 
 export interface BatchProgress {
   batchId: string;
@@ -62,7 +63,6 @@ export function useProcessingQueue() {
   const enqueue = useCallback(({ files, provider, model, format, onFileComplete }: EnqueueOptions) => {
     const batchId = crypto.randomUUID();
     const isLocal = provider === LOCAL_WHISPER_PROVIDER_ID;
-    const txKind = isLocal ? 'local' : 'cloud';
     const initialItems: UploadProgress[] = files.map(file => ({
       fileId: crypto.randomUUID(),
       fileName: file.name,
@@ -78,15 +78,24 @@ export function useProcessingQueue() {
         displayName: string;
         audioPath: string;
         originalFile: File;
+        /** Sobrescreve o provedor do lote (usado no fallback para a OpenAI) */
+        override?: { provider: string; model: string };
       }
 
       const formatDuration = (s: number) =>
         `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
 
-      const callAPI = async (filePath: string, outputFormat?: OutputFormat) => {
+      // O usuário escolhe, nas Configurações, repetir na OpenAI quando o motor local falhar
+      const getFallback = async () => {
+        if (!isLocal || !window.electronAPI) return null;
+        const s = await window.electronAPI.getSettings();
+        return s.success && s.settings.fallbackToOpenAI && s.hasOpenAIKey ? FALLBACK_PROVIDER : null;
+      };
+
+      const callAPI = async (filePath: string, p: { provider: string; model: string }, outputFormat?: OutputFormat) => {
         if (!window.electronAPI) return { success: false, error: 'API não disponível' };
         try {
-          const r = await window.electronAPI.transcribeAudio({ filePath, provider, model, outputFormat });
+          const r = await window.electronAPI.transcribeAudio({ filePath, provider: p.provider, model: p.model, outputFormat });
           if (r.success && r.text) return { success: true, text: r.text, language: r.language, duration: r.duration };
           return { success: false, error: r.error || 'Erro desconhecido' };
         } catch (e) {
@@ -94,9 +103,9 @@ export function useProcessingQueue() {
         }
       };
 
-      const transcribeWithRetry = async (audioPath: string) => {
+      const transcribeWithRetry = async (audioPath: string, p: { provider: string; model: string }) => {
         for (let attempt = 0; attempt < 3; attempt++) {
-          const result = await callAPI(audioPath, format);
+          const result = await callAPI(audioPath, p, format);
           if (result.success) return result;
           const isRateLimit = result.error?.includes('429') ||
             result.error?.toLowerCase().includes('rate limit') ||
@@ -110,13 +119,51 @@ export function useProcessingQueue() {
       const tasks: Promise<void>[] = [];
       let completedCount = 0;
 
-      const startTranscription = (item: WorkItem) => {
-        tasks.push((async () => {
-          await acquireTx(txKind);
+      // Fallback: divide o áudio (limite de upload da OpenAI) e transcreve cada parte na nuvem
+      const runCloudFallback = async (item: WorkItem, localError?: string) => {
+        updateItem(batchId, item.fileId, { status: 'converting', progress: 0 });
+        const split = await window.electronAPI.splitAudio(item.audioPath, CHUNK_DURATION_SECONDS);
+        if (!split.success || !split.chunks.length) {
+          updateItem(batchId, item.fileId, {
+            status: 'error',
+            errorMessage: `${localError ?? 'Falha local'} (fallback OpenAI: ${split.error || 'falha ao preparar o áudio'})`,
+          });
+          return;
+        }
+        const { chunks } = split;
+        const baseName = item.displayName.replace(/.[^/.]+$/, '');
+        const ext = item.displayName.includes('.') ? item.displayName.split('.').pop()! : 'mp4';
+        if (chunks.length === 1) {
+          await startTranscription({ ...item, audioPath: chunks[0], override: FALLBACK_PROVIDER });
+          return;
+        }
+        const entries: UploadProgress[] = chunks.map((_, idx) => ({
+          fileId: crypto.randomUUID(),
+          fileName: `${baseName}_${String(idx + 1).padStart(3, '0')}.${ext}`,
+          progress: 0,
+          status: 'queued' as const,
+        }));
+        replaceItem(batchId, item.fileId, entries);
+        await Promise.all(chunks.map((chunkPath, idx) =>
+          startTranscription({ ...item, fileId: entries[idx].fileId, displayName: entries[idx].fileName, audioPath: chunkPath, override: FALLBACK_PROVIDER })));
+      };
+
+      const startTranscription = (item: WorkItem): Promise<void> => {
+        const eff = item.override ?? { provider, model };
+        const kind = eff.provider === LOCAL_WHISPER_PROVIDER_ID ? 'local' : 'cloud';
+        const task = (async () => {
+          await acquireTx(kind);
+          let fallbackError: string | undefined;
+          let useFallback = false;
           try {
             updateItem(batchId, item.fileId, { status: 'transcribing', progress: 0 });
-            const result = await transcribeWithRetry(item.audioPath);
+            const result = await transcribeWithRetry(item.audioPath, eff);
             if (!result.success) {
+              if (!item.override && await getFallback()) {
+                useFallback = true;
+                fallbackError = result.error;
+                return;
+              }
               updateItem(batchId, item.fileId, { status: 'error', errorMessage: result.error });
               return;
             }
@@ -142,17 +189,21 @@ export function useProcessingQueue() {
               convertedPath: item.audioPath,
               audioPath: item.audioPath,
               isConverted: true,
-              transcriptionProvider: provider,
-              transcriptionModel: model,
+              transcriptionProvider: eff.provider,
+              transcriptionModel: eff.model,
             };
             const isFirst = completedCount === 0;
             completedCount++;
             onFileComplete(tf, isFirst);
             updateItem(batchId, item.fileId, { status: 'completed', progress: 100 });
           } finally {
-            releaseTx(txKind);
+            releaseTx(kind);
           }
-        })());
+          // Fora do slot local: o fallback usa os slots da nuvem
+          if (useFallback) await runCloudFallback(item, fallbackError);
+        })();
+        tasks.push(task);
+        return task;
       };
 
       // Sequential conversion via global mutex — no parallel ffmpeg across batches

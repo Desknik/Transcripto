@@ -24,31 +24,5 @@ declare namespace NodeJS {
 // Used in Renderer process, expose in `preload.ts`
 interface Window {
   ipcRenderer: import('electron').IpcRenderer
-  electronAPI: {
-    convertAudio: (filePath: string) => Promise<any>;
-    saveFileDialog: (options?: { filters?: { name: string; extensions: string[] }[]; defaultPath?: string }) => Promise<{ canceled: boolean; filePath?: string }>;
-    saveFileToDisk: (fileBuffer: ArrayBuffer, fileName: string) => Promise<{ success: boolean; filePath?: string; error?: string }>;
-    copyFile: (sourcePath: string, targetPath: string) => Promise<any>;
-    splitAudio: (filePath: string, chunkDurationSeconds: number) => Promise<{
-      success: boolean;
-      chunks: string[];
-      error?: string;
-    }>;
-    getTranscriptionProviders: () => Promise<any>;
-    transcribeAudio: (request: any) => Promise<any>;
-    getLocalWhisperStatus: () => Promise<{
-      success: boolean;
-      available: boolean;
-      running: boolean;
-      busy?: boolean;
-      model?: string;
-      startedByApp: boolean;
-    }>;
-    startLocalWhisper: () => Promise<{ success: boolean; error?: string }>;
-    stopLocalWhisper: () => Promise<{ success: boolean; error?: string }>;
-    storeGet: (key: string) => Promise<any>;
-    storeSet: (key: string, value: any) => Promise<any>;
-    storeDelete: (key: string) => Promise<any>;
-    storeClear: () => Promise<any>;
-  }
+  electronAPI: import('../src/types/electron').ElectronAPI
 }

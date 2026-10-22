@@ -42,6 +42,26 @@ contextBridge.exposeInMainWorld('electronAPI', {
   startLocalWhisper: () => ipcRenderer.invoke('local-whisper-start'),
   stopLocalWhisper: () => ipcRenderer.invoke('local-whisper-stop'),
 
+  // Settings, local engine and models
+  getSettings: () => ipcRenderer.invoke('settings-get'),
+  updateSettings: (patch: unknown) => ipcRenderer.invoke('settings-update', patch),
+  setOpenAIKey: (key: string | null) => ipcRenderer.invoke('openai-key-set', key),
+  testOpenAIKey: (key?: string) => ipcRenderer.invoke('openai-key-test', key),
+  getEngineStatus: () => ipcRenderer.invoke('engine-status'),
+  setupEngine: () => ipcRenderer.invoke('engine-setup'),
+  downloadModel: (id: string) => ipcRenderer.invoke('model-download', id),
+  removeModel: (id: string) => ipcRenderer.invoke('model-remove', id),
+  onEngineSetupProgress: (cb: (p: unknown) => void) => {
+    const listener = (_: unknown, p: unknown) => cb(p)
+    ipcRenderer.on('engine-setup-progress', listener)
+    return () => ipcRenderer.off('engine-setup-progress', listener)
+  },
+  onModelDownloadProgress: (cb: (p: unknown) => void) => {
+    const listener = (_: unknown, p: unknown) => cb(p)
+    ipcRenderer.on('model-download-progress', listener)
+    return () => ipcRenderer.off('model-download-progress', listener)
+  },
+
   // Store APIs
   storeGet: (key: string) => ipcRenderer.invoke('store-get', key),
   storeSet: (key: string, value: any) => ipcRenderer.invoke('store-set', key, value),

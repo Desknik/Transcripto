@@ -4,13 +4,14 @@ import path from 'node:path'
 import fs from 'node:fs'
 import os from 'node:os'
 import ffmpeg from 'fluent-ffmpeg'
-import ffmpegStatic from 'ffmpeg-static'
-import dotenv from 'dotenv'
+import OpenAI from 'openai'
 import Store from 'electron-store'
 import { TranscriptionServiceManager } from '../src/services/transcription'
-
-// Load environment variables
-dotenv.config()
+import { RuntimeManager } from './runtime/runtimeManager'
+import { ModelManager } from './runtime/modelManager'
+import { getDataDirs, getScriptsDir, getFfmpegPath } from './paths'
+import { getSettings, updateSettings, languageOrUndefined, setOpenAIKey, getOpenAIKey, hasOpenAIKey } from './settings'
+import { AppSettings, EngineStatus } from '../src/types/settings'
 
 // Initialize electron-store
 const store = new Store({
@@ -23,15 +24,32 @@ const store = new Store({
   }
 })
 
-// Initialize transcription service manager
-const transcriptionManager = new TranscriptionServiceManager()
-
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
 // Configure FFmpeg path
-if (ffmpegStatic) {
-  ffmpeg.setFfmpegPath(ffmpegStatic)
+const ffmpegPath = getFfmpegPath()
+if (ffmpegPath) {
+  ffmpeg.setFfmpegPath(ffmpegPath)
 }
+
+// Local engine (embedded Python + faster-whisper), installed on first run into userData
+const dataDirs = getDataDirs()
+const scriptsDir = getScriptsDir()
+const runtime = new RuntimeManager({ ...dataDirs, scriptsDir })
+const models = new ModelManager(runtime, dataDirs.modelsDir, scriptsDir)
+
+const transcriptionManager = new TranscriptionServiceManager({
+  localConfig: {
+    python: runtime.pythonExe,
+    scriptsDir,
+    modelsDir: dataDirs.modelsDir,
+    ffmpegPath: ffmpegPath ?? 'ffmpeg',
+    getSettings,
+  },
+  isLocalReady: async () => runtime.isInstalled() && models.isInstalled(getSettings().whisperModel),
+  getOpenAIKey,
+  getLanguage: () => languageOrUndefined(),
+})
 
 // Audio conversion service
 async function convertToMp3(inputPath: string, outputDir: string): Promise<string> {
@@ -238,7 +256,7 @@ ipcMain.handle('split-audio', async (_, filePath: string, chunkDurationSeconds: 
 // Transcription handlers
 ipcMain.handle('get-transcription-providers', async () => {
   try {
-    const providers = transcriptionManager.getAvailableProviders()
+    const providers = await transcriptionManager.getAvailableProviders()
     return { success: true, providers }
   } catch (error) {
     console.error('Error getting transcription providers:', error)
@@ -261,16 +279,14 @@ ipcMain.handle('transcribe-audio', async (_, request: any) => {
 
 // Local Whisper server controls (status / start / stop)
 ipcMain.handle('local-whisper-status', async () => {
-  const local = transcriptionManager.getLocalWhisper()
-  if (!local) return { success: true, available: false, running: false, startedByApp: false }
-  return { success: true, available: true, ...(await local.getServerStatus()) }
+  const ready = runtime.isInstalled() && models.isInstalled(getSettings().whisperModel)
+  if (!ready) return { success: true, available: false, running: false, startedByApp: false }
+  return { success: true, available: true, ...(await transcriptionManager.getLocalWhisper().getServerStatus()) }
 })
 
 ipcMain.handle('local-whisper-start', async () => {
-  const local = transcriptionManager.getLocalWhisper()
-  if (!local) return { success: false, error: 'Provedor local não configurado' }
   try {
-    await local.startServer()
+    await transcriptionManager.getLocalWhisper().startServer()
     return { success: true }
   } catch (error) {
     return { success: false, error: error instanceof Error ? error.message : 'Unknown error' }
@@ -278,20 +294,111 @@ ipcMain.handle('local-whisper-start', async () => {
 })
 
 ipcMain.handle('local-whisper-stop', async () => {
-  const local = transcriptionManager.getLocalWhisper()
-  if (!local) return { success: false, error: 'Provedor local não configurado' }
-  await local.stopServer()
+  await transcriptionManager.getLocalWhisper().stopServer()
   return { success: true }
 })
 
 // Stop the local server on quit, but only if this app started it
 let quitting = false
 app.on('before-quit', (event) => {
-  const local = transcriptionManager.getLocalWhisper()
-  if (quitting || !local) return
+  if (quitting) return
   event.preventDefault()
   quitting = true
-  local.dispose().finally(() => app.quit())
+  transcriptionManager.getLocalWhisper().dispose().finally(() => app.quit())
+})
+
+// ---------------------------------------------------------------- settings / engine / models
+
+const errorMessage = (e: unknown) => (e instanceof Error ? e.message : 'Unknown error')
+
+ipcMain.handle('settings-get', () => ({ success: true, settings: getSettings(), hasOpenAIKey: hasOpenAIKey() }))
+
+ipcMain.handle('settings-update', async (_, patch: Partial<AppSettings>) => {
+  try {
+    const before = getSettings()
+    const settings = updateSettings(patch)
+    // Servidor em execução com configuração antiga: para, e o próximo uso o reinicia com a nova
+    if (before.device !== settings.device || before.idleMinutes !== settings.idleMinutes) {
+      await transcriptionManager.getLocalWhisper().stopServer()
+    }
+    return { success: true, settings }
+  } catch (e) {
+    return { success: false, error: errorMessage(e) }
+  }
+})
+
+ipcMain.handle('openai-key-set', (_, key: string | null) => {
+  try {
+    setOpenAIKey(key)
+    if (!hasOpenAIKey()) updateSettings({ fallbackToOpenAI: false })
+    return { success: true, hasOpenAIKey: hasOpenAIKey() }
+  } catch (e) {
+    return { success: false, error: errorMessage(e) }
+  }
+})
+
+// Testa uma chave digitada (ainda não salva) ou, sem argumento, a chave salva
+ipcMain.handle('openai-key-test', async (_, key?: string) => {
+  const apiKey = key?.trim() || getOpenAIKey()
+  if (!apiKey) return { success: false, error: 'Nenhuma chave informada' }
+  try {
+    await new OpenAI({ apiKey }).models.list()
+    return { success: true }
+  } catch (e) {
+    return { success: false, error: errorMessage(e) }
+  }
+})
+
+ipcMain.handle('engine-status', async () => {
+  try {
+    const installedModels = runtime.isInstalled() ? await models.list() : []
+    const modelOk = installedModels.some(m => m.id === getSettings().whisperModel)
+    const status = await runtime.getStatus(modelOk)
+    return { success: true, status: { ...status, installedModels } satisfies EngineStatus }
+  } catch (e) {
+    return { success: false, error: errorMessage(e) }
+  }
+})
+
+// Primeiro uso: instala Python + dependências e baixa o modelo escolhido; progresso em 'engine-setup-progress'
+let settingUp = false
+ipcMain.handle('engine-setup', async () => {
+  if (settingUp) return { success: false, error: 'A instalação já está em andamento' }
+  settingUp = true
+  const emit = (p: { stage: string; message: string; percent?: number }) => win?.webContents.send('engine-setup-progress', p)
+  try {
+    await runtime.setup(emit)
+    const model = getSettings().whisperModel
+    if (!models.isInstalled(model)) {
+      const message = `Baixando modelo ${model}…`
+      emit({ stage: 'model', message, percent: 0 })
+      await models.download(model, (done, total) => emit({ stage: 'model', message, percent: total ? (done / total) * 100 : undefined }))
+    }
+    return { success: true }
+  } catch (e) {
+    return { success: false, error: errorMessage(e) }
+  } finally {
+    settingUp = false
+  }
+})
+
+ipcMain.handle('model-download', async (_, id: string) => {
+  try {
+    await models.download(id, (done, total) => win?.webContents.send('model-download-progress', { id, done, total }))
+    return { success: true }
+  } catch (e) {
+    return { success: false, error: errorMessage(e) }
+  }
+})
+
+ipcMain.handle('model-remove', async (_, id: string) => {
+  try {
+    if (getSettings().whisperModel === id) throw new Error('Este é o modelo em uso; escolha outro antes de removê-lo')
+    await models.remove(id)
+    return { success: true }
+  } catch (e) {
+    return { success: false, error: errorMessage(e) }
+  }
 })
 
 // Store handlers

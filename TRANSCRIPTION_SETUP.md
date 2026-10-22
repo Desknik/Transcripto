@@ -20,60 +20,51 @@
 
 ## Configuração
 
-### 1. Instalar Dependências
+Tudo é configurado dentro do app (ícone de engrenagem). Não há mais `.env` nem caminhos de Python.
+
+### Primeiro uso (usuário final)
+
+Ao abrir o Transcripto pela primeira vez, o assistente baixa e instala, em `%APPDATA%\transcripto\`:
+
+1. Python 3.12 embarcado + pip;
+2. o motor (faster-whisper e dependências) e, se houver GPU NVIDIA, as bibliotecas CUDA (~1,5 GB);
+3. o modelo **large-v3-turbo** (~1,6 GB).
+
+Depois disso a transcrição local funciona offline. Sem GPU NVIDIA o app usa a CPU (mais lento).
+
+### Configurações
+
+- **Idioma:** português por padrão; escolha outro idioma ou "detectar automaticamente" (vale para o local e a OpenAI).
+- **Motor local:** reparar/atualizar a instalação, dispositivo (automático, GPU, CPU) e ociosidade do servidor.
+- **Modelos:** baixar, usar e remover modelos (tiny, base, small, medium, large-v3-turbo, large-v3).
+- **OpenAI (opcional):** chave da API (testada antes de salvar e guardada criptografada). Marque
+  "usar a OpenAI como fallback" para repetir na OpenAI quando o motor local falhar. A cobrança é na sua conta.
+
+### Servidor local
+
+O servidor (`whisper_server.py`) mantém o modelo carregado. Sobe sozinho na primeira transcrição local
+(ou pelo botão "Servidor" do seletor) e é encerrado ao fechar o app, se o app o iniciou.
+
+### Código Python
+
+Em `resources/python/`: `transcriber.py` (CLI única, `--diarize` para locutor por canal), `vlk_whisper.py`
+(núcleo), `whisper_server.py`, `model_manager.py` e os `requirements-*.txt` (versões fixadas).
+A configuração chega por variáveis `VLK_*` definidas pelo app.
+
+### Gerar o instalador (Windows)
 
 ```bash
 npm install
+npm run dist     # gera release/<versão>/Transcripto-Windows-<versão>-Setup.exe (~100 MB)
 ```
 
-### 2. Configurar API Keys
+Observações:
+- Ative o **Modo Desenvolvedor** do Windows (ou rode o terminal como administrador): o electron-builder precisa
+  criar links simbólicos ao extrair o `winCodeSign`. Sem isso o build falha na etapa de edição do executável.
+- O executável não é assinado; o SmartScreen mostrará um aviso até que seja assinado.
+- Desinstalar não apaga `%APPDATA%\transcripto\` (runtime e modelos, vários GB).
 
-Crie um arquivo `.env` na raiz do projeto:
-
-```env
-# OpenAI API Key (obrigatório para transcrição)
-OPENAI_API_KEY=sua_chave_api_openai_aqui
-
-# Futuras integrações (opcional)
-# ELEVENLABS_API_KEY=sua_chave_elevenlabs
-# AZURE_API_KEY=sua_chave_azure
-# AWS_ACCESS_KEY_ID=sua_chave_aws
-# AWS_SECRET_ACCESS_KEY=sua_chave_secreta_aws
-```
-
-### 2.1 Transcrição local (faster-whisper, opcional)
-
-Usa os scripts Python da pasta `poc-lvk` (venv com faster-whisper + CUDA). No `.env` do Transcripto:
-
-```env
-LOCAL_WHISPER_PYTHON=C:\DEV\IA\poc-lvk\Scripts\python.exe
-LOCAL_WHISPER_TRANSCRIBE_SCRIPT=C:\DEV\IA\poc-lvk\transcrever.py
-LOCAL_WHISPER_DIARIZE_SCRIPT=C:\DEV\IA\poc-lvk\transcrever_diarizado.py  # opcional
-LOCAL_WHISPER_AUTOSTART=true   # opcional; false = servidor só manual/botão
-```
-
-O provedor **Local** aparece no seletor com os modos *Transcrição* e *Diarizada por canal*
-(áudio mono cai na transcrição normal). Arquivos vão inteiros ao script, sem divisão em partes,
-e uma transcrição roda por vez (GPU).
-
-Porta, modelo e ociosidade ficam no `.env` da pasta dos scripts (`C:\DEV\IA\poc-lvk\.env`):
-
-```env
-WHISPER_MODEL=large-v3-turbo
-WHISPER_SERVER_PORT=8765
-WHISPER_SERVER_IDLE_MINUTES=0   # 0 = nunca desliga; >0 = minutos de ociosidade até encerrar
-```
-
-**Servidor (`whisper_server.py`)** mantém o modelo carregado na GPU. Os scripts verificam se ele está
-no ar: se estiver, delegam o job a ele (sem abrir nem fechar nada); se não, carregam o modelo,
-processam e descarregam. O servidor pode ser iniciado:
-- manualmente, com `iniciar-servidor.bat` (ou `python whisper_server.py`);
-- pelo botão "Servidor" no seletor do app (aparece com o provedor Local selecionado);
-- automaticamente na primeira transcrição local (`LOCAL_WHISPER_AUTOSTART`), nunca ao abrir o app.
-
-Ao fechar o app, só é encerrado o servidor que o próprio app iniciou.
-
-### 3. Executar o Projeto
+### Executar em desenvolvimento
 
 ```bash
 npm run dev
