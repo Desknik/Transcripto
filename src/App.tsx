@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Mic, Settings as SettingsIcon } from 'lucide-react';
+import { Settings as SettingsIcon } from 'lucide-react';
+import logo from './assets/cpod.svg';
 import SettingsModal from './components/SettingsModal';
 import SetupWizard from './components/SetupWizard';
-import { EngineStatus, DEFAULT_SETTINGS } from './types/settings';
+import { EngineStatus } from './types/settings';
 import FileUpload from './components/FileUpload';
 import Sidebar from './components/Sidebar';
 import TranscriptionPanel from './components/TranscriptionPanel';
@@ -41,14 +42,12 @@ function App() {
 
   const [showSettings, setShowSettings] = useState(false);
   const [engine, setEngine] = useState<EngineStatus | null>(null);
-  const [modelId, setModelId] = useState(DEFAULT_SETTINGS.whisperModel);
   const [wizardSkipped, setWizardSkipped] = useState(false);
   // Muda quando configurações/modelos mudam, para o seletor de provedor recarregar
   const [providersVersion, setProvidersVersion] = useState(0);
 
   const refreshEngine = useCallback(async () => {
-    const [s, e] = await Promise.all([window.electronAPI.getSettings(), window.electronAPI.getEngineStatus()]);
-    if (s.success) setModelId(s.settings.whisperModel);
+    const e = await window.electronAPI.getEngineStatus();
     if (e.success && e.status) setEngine(e.status);
     setProvidersVersion(v => v + 1);
   }, []);
@@ -102,6 +101,12 @@ function App() {
         },
       });
     }
+  };
+
+  const clearAllTranscriptions = async () => {
+    await saveSelectedFileId(null);
+    await saveSelectedGroupId(null);
+    await saveGroups([]);
   };
 
   const handleGenerateFormat = async (fileId: string, format: OutputFormat) => {
@@ -177,19 +182,24 @@ function App() {
   const hasTranscriptions = groups.length > 0;
 
   return (
-    <div className="min-h-screen bg-gray-100">
-      <button
-        onClick={() => setShowSettings(true)}
-        title="Configurações"
-        className="fixed top-3 right-3 z-30 p-2 bg-white border border-gray-200 rounded-lg shadow-sm text-gray-600 hover:text-gray-900 hover:bg-gray-50"
-      >
-        <SettingsIcon className="w-4 h-4" />
-      </button>
+    <div className="h-screen flex flex-col bg-gray-100">
+      <header className="h-12 flex-shrink-0 flex items-center justify-between px-4 bg-white border-b border-gray-200">
+        <div className="flex items-center gap-2">
+          <img src={logo} alt="cPod" className="h-7" />
+          <h1 className="text-sm font-semibold text-brand-700">cPod - Transcripto</h1>
+        </div>
+        <button
+          onClick={() => setShowSettings(true)}
+          title="Configurações"
+          className="p-2 rounded-lg text-gray-600 hover:text-gray-900 hover:bg-gray-100"
+        >
+          <SettingsIcon className="w-4 h-4" />
+        </button>
+      </header>
 
       {engine && !engine.ready && !wizardSkipped && !showSettings && (
         <SetupWizard
           status={engine}
-          modelId={modelId}
           onDone={refreshEngine}
           onSkip={() => setWizardSkipped(true)}
           onOpenSettings={() => setShowSettings(true)}
@@ -200,10 +210,11 @@ function App() {
         <SettingsModal
           onClose={() => setShowSettings(false)}
           onChanged={refreshEngine}
+          onClearTranscriptions={clearAllTranscriptions}
         />
       )}
 
-      <div className="flex h-screen">
+      <div className="flex flex-1 min-h-0">
         {/* Sidebar - only show if there are transcriptions */}
         {hasTranscriptions && (
           <Sidebar
@@ -242,9 +253,7 @@ function App() {
               
               <div className="flex-1 flex items-center justify-center p-8">
                 <div className="text-center max-w-2xl">
-                  <div className="w-20 h-20 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-6">
-                    <Mic className="w-10 h-10 text-blue-600" />
-                  </div>
+                  <img src={logo} alt="cPod" className="h-20 mx-auto mb-6" />
                   <h2 className="text-2xl font-bold text-gray-900 mb-4">
                     {!hasTranscriptions ? 'Nenhuma transcrição encontrada' : 
                      selectedGroupId ? 'Adicionar ao Grupo' : 'Nova Transcrição'}

@@ -121,7 +121,7 @@ const Sidebar: React.FC<SidebarProps> = ({
       }    }  };
     const getFileIcon = (file: TranscriptionFile) => {
     if (file.type.includes('audio')) {
-      return <Mic className="w-4 h-4 text-blue-500" />;
+      return <Mic className="w-4 h-4 text-brand-500" />;
     }
     if (file.type.includes('video')) {
       return <VideoIcon className="w-4 h-4 text-purple-500" />;
@@ -151,7 +151,7 @@ const Sidebar: React.FC<SidebarProps> = ({
           </p>
           <button
             onClick={() => onNewTranscriptionGeneral()}
-            className="mt-3 w-full bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white px-4 py-2.5 rounded-lg font-medium transition-all duration-200 text-sm shadow-sm hover:shadow-md flex items-center justify-center space-x-2 group"
+            className="mt-3 w-full bg-gradient-to-r from-brand-600 to-brand-700 hover:from-brand-700 hover:to-brand-800 text-white px-4 py-2.5 rounded-lg font-medium transition-all duration-200 text-sm shadow-sm hover:shadow-md flex items-center justify-center space-x-2 group"
           >
             <div className="w-4 h-4 bg-white/20 rounded-full flex items-center justify-center group-hover:bg-white/30 transition-colors">
               <Plus className="w-2.5 h-2.5" />

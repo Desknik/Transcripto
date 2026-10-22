@@ -51,12 +51,12 @@ const EditableGroupHeader: React.FC<EditableGroupHeaderProps> = ({ group, onUpda
           onChange={(e) => setEditValue(e.target.value)}
           onKeyDown={handleKeyDown}
           onBlur={handleBlur}
-          className="text-sm font-medium text-gray-900 bg-transparent border-b border-blue-500 outline-none w-full"
+          className="text-sm font-medium text-gray-900 bg-transparent border-b border-brand-500 outline-none w-full"
           placeholder="Nome do grupo"
         />
       ) : (
         <span 
-          className="text-sm font-medium text-gray-900 cursor-pointer hover:text-blue-600 transition-colors"
+          className="text-sm font-medium text-gray-900 cursor-pointer hover:text-brand-600 transition-colors"
           onClick={handleClick}
           title="Clique para editar o nome"
         >

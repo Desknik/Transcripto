@@ -65,7 +65,7 @@ const TranscriptionPanel: React.FC<TranscriptionPanelProps> = ({
         {group && showGroupHeader && (
           <header className="bg-white border-b border-gray-200 px-6 py-4">
             <div className="flex items-center space-x-3">
-              <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center">
+              <div className="w-8 h-8 bg-brand-600 rounded-lg flex items-center justify-center">
                 <Mic className="w-5 h-5 text-white" />
               </div>
               <div>
@@ -109,7 +109,7 @@ const TranscriptionPanel: React.FC<TranscriptionPanelProps> = ({
   const getFileIcon = () => {
     const extension = file.name.split('.').pop()?.toLowerCase();
     if (['mp4', 'mov', 'avi', 'mkv'].includes(extension || '')) {
-      return <FileVideo className="w-5 h-5 text-blue-500" />;
+      return <FileVideo className="w-5 h-5 text-brand-500" />;
     }
     return <FileAudio className="w-5 h-5 text-emerald-500" />;
   };
@@ -166,7 +166,7 @@ const TranscriptionPanel: React.FC<TranscriptionPanelProps> = ({
         {group && showGroupHeader && (
           <header className="bg-white border-b border-gray-200 px-6 py-4">
             <div className="flex items-center space-x-3">
-              <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center">
+              <div className="w-8 h-8 bg-brand-600 rounded-lg flex items-center justify-center">
                 <Mic className="w-5 h-5 text-white" />
               </div>
               <div>
@@ -222,7 +222,7 @@ const TranscriptionPanel: React.FC<TranscriptionPanelProps> = ({
                   )}
                   {file.transcriptionProvider && (
                     <div className="flex items-center space-x-1">
-                      <span className="text-xs px-2 py-1 bg-blue-100 text-blue-800 rounded-full">
+                      <span className="text-xs px-2 py-1 bg-brand-100 text-brand-800 rounded-full">
                         {file.transcriptionProvider.toUpperCase()}
                         {file.transcriptionModel && ` • ${file.transcriptionModel}`}
                       </span>
@@ -235,7 +235,7 @@ const TranscriptionPanel: React.FC<TranscriptionPanelProps> = ({
             <div className="flex items-center space-x-2">
               <div className="relative" ref={downloadRef}>
                 <button 
-                  className="flex items-center space-x-2 px-4 py-2 text-sm font-medium text-blue-700 bg-blue-50 border border-blue-200 rounded-lg hover:bg-blue-100 transition-colors"
+                  className="flex items-center space-x-2 px-4 py-2 text-sm font-medium text-brand-700 bg-brand-50 border border-brand-200 rounded-lg hover:bg-brand-100 transition-colors"
                   onClick={() => setShowDownloadDropdown(!showDownloadDropdown)}
                 >
                   <Download className="w-4 h-4" />
@@ -290,7 +290,7 @@ const TranscriptionPanel: React.FC<TranscriptionPanelProps> = ({
 
               {file.isConverted && file.convertedPath && (
                 <button 
-                  className="flex items-center space-x-2 px-4 py-2 text-sm font-medium text-blue-700 bg-blue-50 border border-blue-200 rounded-lg hover:bg-blue-100 transition-colors"
+                  className="flex items-center space-x-2 px-4 py-2 text-sm font-medium text-brand-700 bg-brand-50 border border-brand-200 rounded-lg hover:bg-brand-100 transition-colors"
                   onClick={async () => {
                     const result = await downloadConvertedFile(file.convertedPath!);
                     if (!result.canceled && !result.error) {
@@ -326,7 +326,7 @@ const TranscriptionPanel: React.FC<TranscriptionPanelProps> = ({
                 key={transcription.id}
                 className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors whitespace-nowrap ${
                   file.activeFormat === transcription.format
-                    ? 'bg-white text-blue-700 shadow-sm border border-blue-200'
+                    ? 'bg-white text-brand-700 shadow-sm border border-brand-200'
                     : 'text-gray-600 hover:bg-white hover:text-gray-900'
                 }`}
                 onClick={() => {
@@ -376,11 +376,11 @@ const TranscriptionPanel: React.FC<TranscriptionPanelProps> = ({
             
             {activeTranscription && (
               <div className="mt-6 grid grid-cols-1 sm:grid-cols-3 gap-4">
-                <div className="bg-blue-50 rounded-lg p-4 text-center">
-                  <div className="text-2xl font-bold text-blue-600">
+                <div className="bg-brand-50 rounded-lg p-4 text-center">
+                  <div className="text-2xl font-bold text-brand-600">
                     {activeTranscription.content.split(' ').length}
                   </div>
-                  <div className="text-sm text-blue-600 font-medium">Palavras</div>
+                  <div className="text-sm text-brand-600 font-medium">Palavras</div>
                 </div>
                 <div className="bg-emerald-50 rounded-lg p-4 text-center">
                   <div className="text-2xl font-bold text-emerald-600">

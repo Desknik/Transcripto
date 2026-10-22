@@ -78,7 +78,7 @@ export const SortableGroup: React.FC<SortableGroupProps> = ({
         {/* Add Button - sempre visível */}
         <button
           onClick={() => onNewTranscription(group.id)}
-          className="p-1.5 hover:bg-blue-200 text-blue-600 rounded-r-md transition-colors"
+          className="p-1.5 hover:bg-brand-200 text-brand-600 rounded-r-md transition-colors"
           title="Nova Transcrição"
         >
           <Plus className="w-3 h-3" />

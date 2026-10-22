@@ -52,12 +52,12 @@ const EditableFileName: React.FC<EditableFileNameProps> = ({ file, onUpdateName 
           onChange={(e) => setEditValue(e.target.value)}
           onKeyDown={handleKeyDown}
           onBlur={handleBlur}
-          className="text-xl font-semibold text-gray-900 bg-transparent border-b border-blue-500 outline-none w-full truncate"
+          className="text-xl font-semibold text-gray-900 bg-transparent border-b border-brand-500 outline-none w-full truncate"
           placeholder="Nome do arquivo"
         />
       ) : (
         <h2 
-          className="text-xl font-semibold text-gray-900 truncate cursor-pointer hover:text-blue-600 transition-colors"
+          className="text-xl font-semibold text-gray-900 truncate cursor-pointer hover:text-brand-600 transition-colors"
           onClick={handleClick}
           title="Clique para editar o nome"
         >

@@ -62,7 +62,7 @@ export const SortableFile: React.FC<SortableFileProps> = ({
         onClick={onSelect}
         className={`flex-1 p-3 pl-2 text-left hover:bg-gray-50 transition-colors border-l-2 ${
           isSelected
-            ? "bg-blue-50 border-l-blue-500"
+            ? "bg-brand-50 border-l-brand-500"
             : "border-l-transparent hover:border-l-gray-200"
         }`}
       >

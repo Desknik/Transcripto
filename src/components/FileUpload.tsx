@@ -24,7 +24,7 @@ const acceptedExtensions = '.mp3,.wav,.m4a,.aac,.ogg,.mp4,.mov,.avi,.mkv';
 const getFileIcon = (fileName: string) => {
   const ext = fileName.split('.').pop()?.toLowerCase();
   if (['mp4', 'mov', 'avi', 'mkv'].includes(ext || '')) {
-    return <FileVideo className="w-5 h-5 text-blue-500" />;
+    return <FileVideo className="w-5 h-5 text-brand-500" />;
   }
   return <FileAudio className="w-5 h-5 text-emerald-500" />;
 };
@@ -50,7 +50,7 @@ const ItemRow: React.FC<{ item: UploadProgress; onDismiss: () => void }> = ({ it
           : item.status === 'queued' ? 'bg-gray-400'
           : item.status === 'transcribing' ? 'bg-purple-500 animate-pulse'
           : item.status === 'error' ? 'bg-red-500'
-          : 'bg-blue-500'
+          : 'bg-brand-500'
         }`}
         style={{ width: item.status === 'queued' ? '100%' : `${item.progress}%` }}
       />
@@ -120,7 +120,7 @@ const FileUpload: React.FC<FileUploadProps> = ({ onFilesSelected, batches, onDis
 
       <div
         className={`relative border-2 border-dashed rounded-xl p-12 text-center transition-all duration-200 ${
-          isDragOver ? 'border-blue-400 bg-blue-50' : 'border-gray-300 hover:border-gray-400'
+          isDragOver ? 'border-brand-400 bg-brand-50' : 'border-gray-300 hover:border-gray-400'
         }`}
         onDrop={handleDrop}
         onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); setIsDragOver(true); }}
@@ -139,7 +139,7 @@ const FileUpload: React.FC<FileUploadProps> = ({ onFilesSelected, batches, onDis
           onChange={handleFileSelect}
           className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
         />
-        <button className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg font-medium transition-colors">
+        <button className="bg-brand-600 hover:bg-brand-700 text-white px-6 py-3 rounded-lg font-medium transition-colors">
           Selecionar Arquivos
         </button>
       </div>

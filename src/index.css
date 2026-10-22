@@ -1,1 +1,19 @@
 @import "tailwindcss";
+
+/* Identidade visual cPod: verde-petróleo da marca como cor principal e roxo/ciano/menta como acentos do logo */
+@theme {
+  --color-brand-50: #effaf9;
+  --color-brand-100: #d4f1ee;
+  --color-brand-200: #a9e3dd;
+  --color-brand-300: #74cdc5;
+  --color-brand-400: #44b0a8;
+  --color-brand-500: #2a918b;
+  --color-brand-600: #227670;
+  --color-brand-700: #1f5c59;
+  --color-brand-800: #1a4a48;
+  --color-brand-900: #173e3c;
+
+  --color-accent-purple: #c333f3;
+  --color-accent-cyan: #33c3f3;
+  --color-accent-mint: #33f3c3;
+}

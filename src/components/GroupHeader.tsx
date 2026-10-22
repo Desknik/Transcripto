@@ -70,8 +70,8 @@ const GroupHeader: React.FC<GroupHeaderProps> = ({ group, onUpdateName, onDelete
     <div className="bg-white border-b border-gray-200 p-6">
       <div className="flex items-center justify-between">
         <div className="flex items-center space-x-4">
-          <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
-            <Folder className="w-6 h-6 text-blue-600" />
+          <div className="w-12 h-12 bg-brand-100 rounded-lg flex items-center justify-center">
+            <Folder className="w-6 h-6 text-brand-600" />
           </div>
           
           <div>

@@ -36,9 +36,9 @@ const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
       background: 'bg-yellow-50'
     },
     info: {
-      icon: 'text-blue-600',
-      button: 'bg-blue-600 hover:bg-blue-700 focus:ring-blue-500',
-      background: 'bg-blue-50'
+      icon: 'text-brand-600',
+      button: 'bg-brand-600 hover:bg-brand-700 focus:ring-brand-500',
+      background: 'bg-brand-50'
     }
   };
 

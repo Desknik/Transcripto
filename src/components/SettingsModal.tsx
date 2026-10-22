@@ -1,18 +1,23 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { X, Download, Trash2, Check, Loader2, KeyRound, Cpu, Languages, Wrench } from 'lucide-react';
+import { X, Download, Trash2, Check, Loader2, KeyRound, Cpu, Languages, Wrench, Database } from 'lucide-react';
+import ConfirmationModal from './ConfirmationModal';
 import {
-  AppSettings, DEFAULT_SETTINGS, DeviceChoice, EngineStatus, LANGUAGES, SetupEvent, WHISPER_MODELS,
+  AppSettings, DEFAULT_SETTINGS, DeviceChoice, EngineStatus, LANGUAGES, SetupEvent, WHISPER_MODELS, recommendationReason,
 } from '../types/settings';
 
 interface SettingsModalProps {
   onClose: () => void;
   /** Chamado ao fechar, se algo que afeta provedores/modelos mudou */
   onChanged: () => void;
+  /** Apaga todas as transcrições e grupos do histórico */
+  onClearTranscriptions: () => Promise<void>;
 }
 
 const formatSize = (mb: number) => (mb >= 1024 ? `${(mb / 1024).toFixed(1)} GB` : `${mb} MB`);
 
-const SettingsModal: React.FC<SettingsModalProps> = ({ onClose, onChanged }) => {
+const SettingsModal: React.FC<SettingsModalProps> = ({ onClose, onChanged, onClearTranscriptions }) => {
+  const [confirmClear, setConfirmClear] = useState(false);
+  const [cleared, setCleared] = useState(false);
   const [settings, setSettings] = useState<AppSettings>(DEFAULT_SETTINGS);
   const [hasKey, setHasKey] = useState(false);
   const [engine, setEngine] = useState<EngineStatus | null>(null);
@@ -38,6 +43,12 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ onClose, onChanged }) => 
     const offSetup = api.onEngineSetupProgress(setRepair);
     return () => { offModel(); offSetup(); };
   }, [api, refreshEngine]);
+
+  const clearAll = async () => {
+    setConfirmClear(false);
+    await onClearTranscriptions();
+    setCleared(true);
+  };
 
   const close = () => { if (changed) onChanged(); onClose(); };
 
@@ -159,7 +170,8 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ onClose, onChanged }) => 
 
           {/* Modelos */}
           <div className={section}>
-            <h3 className="text-sm font-semibold text-gray-900 mb-3">Modelos de transcrição</h3>
+            <h3 className="text-sm font-semibold text-gray-900 mb-1">Modelos de transcrição</h3>
+            {engine && <p className="text-[11px] text-gray-500 mb-3">{recommendationReason(engine.hardware)}</p>}
             <ul className="divide-y divide-gray-100">
               {WHISPER_MODELS.map(m => {
                 const isInstalled = installed.has(m.id);
@@ -170,12 +182,15 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ onClose, onChanged }) => 
                     <div className="flex-1 min-w-0">
                       <div className="text-sm text-gray-900">
                         {m.name} <span className="text-[11px] text-gray-500">· {formatSize(m.sizeMB)}</span>
-                        {inUse && <span className="ml-2 text-[10px] px-1.5 py-0.5 bg-blue-100 text-blue-700 rounded">em uso</span>}
+                        {inUse && <span className="ml-2 text-[10px] px-1.5 py-0.5 bg-brand-100 text-brand-700 rounded">em uso</span>}
+                        {engine?.recommendedModel === m.id && <span className="ml-2 text-[10px] px-1.5 py-0.5 bg-green-100 text-green-700 rounded">recomendado</span>}
                       </div>
-                      <div className="text-[11px] text-gray-500">{m.description}</div>
+                      <div className="text-[11px] text-gray-500">
+                        {m.description} · qualidade {'★'.repeat(m.quality)}{'☆'.repeat(5 - m.quality)} · velocidade {'★'.repeat(m.speed)}{'☆'.repeat(5 - m.speed)}
+                      </div>
                       {downloading && (
                         <div className="h-1.5 bg-gray-200 rounded-full overflow-hidden mt-1">
-                          <div className="h-full bg-blue-600 transition-all" style={{ width: `${progress[m.id]}%` }} />
+                          <div className="h-full bg-brand-600 transition-all" style={{ width: `${progress[m.id]}%` }} />
                         </div>
                       )}
                     </div>
@@ -210,6 +225,23 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ onClose, onChanged }) => 
             </ul>
           </div>
 
+          {/* Dados */}
+          <div className={section}>
+            <h3 className="flex items-center gap-2 text-sm font-semibold text-gray-900 mb-3"><Database className="w-4 h-4" /> Dados</h3>
+            <div className="flex items-center justify-between gap-4">
+              <p className="text-[11px] text-gray-500">
+                Remove todo o histórico de transcrições e grupos. O motor local, os modelos e suas configurações são mantidos.
+              </p>
+              <button
+                onClick={() => { setCleared(false); setConfirmClear(true); }}
+                className="flex items-center gap-1 px-3 py-1.5 border border-red-300 text-red-600 rounded-lg text-sm hover:bg-red-50 whitespace-nowrap"
+              >
+                <Trash2 className="w-4 h-4" /> Limpar transcrições
+              </button>
+            </div>
+            {cleared && <p className="text-[11px] text-green-700 mt-2">Histórico apagado.</p>}
+          </div>
+
           {/* OpenAI */}
           <div className={section}>
             <h3 className="flex items-center gap-2 text-sm font-semibold text-gray-900 mb-3"><KeyRound className="w-4 h-4" /> OpenAI (opcional)</h3>
@@ -227,7 +259,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ onClose, onChanged }) => 
               />
               <button
                 onClick={saveKey} disabled={!keyInput.trim()}
-                className="px-3 py-1.5 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700 disabled:opacity-40 whitespace-nowrap"
+                className="px-3 py-1.5 bg-brand-600 text-white rounded-lg text-sm hover:bg-brand-700 disabled:opacity-40 whitespace-nowrap"
               >
                 Testar e salvar
               </button>
@@ -248,6 +280,15 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ onClose, onChanged }) => 
             </label>
           </div>
         </div>
+
+        <ConfirmationModal
+          isOpen={confirmClear}
+          onClose={() => setConfirmClear(false)}
+          onConfirm={clearAll}
+          title="Limpar todas as transcrições"
+          message="Todas as transcrições e grupos do histórico serão apagados permanentemente. Esta ação não pode ser desfeita."
+          confirmText="Apagar tudo"
+        />
 
         <div className="px-5 py-3 border-t border-gray-200 flex justify-end">
           <button onClick={close} className="px-4 py-1.5 bg-gray-900 text-white rounded-lg text-sm hover:bg-gray-700">Fechar</button>

@@ -1,8 +1,10 @@
 import { spawn, execFile } from 'node:child_process'
 import fs from 'node:fs'
+import os from 'node:os'
 import path from 'node:path'
 import readline from 'node:readline'
 import { downloadFile } from './download'
+import { HardwareInfo, recommendModel } from '../../src/types/settings'
 
 const PYTHON_VERSION = '3.12.10'
 const PYTHON_URL = `https://www.python.org/ftp/python/${PYTHON_VERSION}/python-${PYTHON_VERSION}-embed-amd64.zip`
@@ -37,6 +39,8 @@ interface RuntimeState {
 export interface RuntimeStatus {
   ready: boolean
   hasGpu: boolean
+  hardware: HardwareInfo
+  recommendedModel: string
   cudaInstalled: boolean
   /** Etapas que ainda faltam: 'python' | 'deps' | 'model' */
   missing: string[]
@@ -61,11 +65,23 @@ export class RuntimeManager {
   // ------------------------------------------------------------------ detecção
 
   /** GPU NVIDIA presente? (nvidia-smi acompanha o driver) */
-  detectGpu(): Promise<boolean> {
+  async detectGpu(): Promise<boolean> {
+    return (await this.detectHardware()).hasGpu
+  }
+
+  /** GPU (nome e VRAM da maior), RAM e núcleos de CPU, para recomendar o modelo. */
+  detectHardware(): Promise<HardwareInfo> {
+    const base = { ramMB: Math.round(os.totalmem() / 1048576), cpuCores: os.cpus().length }
     return new Promise(resolve => {
-      execFile('nvidia-smi', ['-L'], { windowsHide: true, timeout: 8000 }, (err, stdout) => {
-        resolve(!err && /GPU \d+/.test(stdout))
-      })
+      execFile('nvidia-smi', ['--query-gpu=name,memory.total', '--format=csv,noheader,nounits'],
+        { windowsHide: true, timeout: 8000 }, (err, stdout) => {
+          const gpus = err ? [] : stdout.trim().split(/\r?\n/).map(line => {
+            const [name, mem] = line.split(',').map(x => x.trim())
+            return { name, vramMB: parseInt(mem, 10) }
+          }).filter(g => g.name && Number.isFinite(g.vramMB))
+          const best = gpus.sort((a, b) => b.vramMB - a.vramMB)[0]
+          resolve(best ? { ...base, hasGpu: true, gpuName: best.name, vramMB: best.vramMB } : { ...base, hasGpu: false })
+        })
     })
   }
 
@@ -76,12 +92,16 @@ export class RuntimeManager {
 
   async getStatus(modelInstalled: boolean): Promise<RuntimeStatus> {
     const state = this.readState()
-    const hasGpu = await this.detectGpu()
+    const hardware = await this.detectHardware()
+    const hasGpu = hardware.hasGpu
     const missing: string[] = []
     if (!fs.existsSync(this.pythonExe)) missing.push('python')
     else if (state.depsRevision !== DEPS_REVISION || (hasGpu && !state.cuda)) missing.push('deps')
     if (!modelInstalled) missing.push('model')
-    return { ready: missing.length === 0, hasGpu, cudaInstalled: !!state.cuda, missing }
+    return {
+      ready: missing.length === 0, hasGpu, hardware, recommendedModel: recommendModel(hardware),
+      cudaInstalled: !!state.cuda, missing,
+    }
   }
 
   // ------------------------------------------------------------------ instalação

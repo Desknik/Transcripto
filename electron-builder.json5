@@ -14,18 +14,21 @@
   ],
   asarUnpack: ["node_modules/ffmpeg-static/**"],
   win: {
+    icon: "resources/icon.png",
     target: [
-      {
-        target: "nsis",
-        arch: ["x64"],
-      },
+      { target: "nsis", arch: ["x64"] },
+      { target: "portable", arch: ["x64"] },
     ],
-    artifactName: "${productName}-Windows-${version}-Setup.${ext}",
   },
   nsis: {
     oneClick: false,
     perMachine: false,
+    shortcutName: "cPod - Transcripto",
     allowToChangeInstallationDirectory: true,
+    artifactName: "${productName}-Windows-${version}-Setup.${ext}",
     deleteAppDataOnUninstall: false,
+  },
+  portable: {
+    artifactName: "${productName}-Windows-${version}-Portable.${ext}",
   },
 }

@@ -121,15 +121,15 @@ const TranscriptionProviderSelector: React.FC<TranscriptionProviderSelectorProps
     return (
       <div className="mb-2 flex items-center gap-3">
         <div className="relative" ref={modelRef}>
-          <button className="flex items-center space-x-2 px-3 py-1.5 border border-blue-200 rounded-lg bg-blue-50 text-xs">
-            <Cpu className="w-3.5 h-3.5 text-blue-600" />
-            <span className="text-blue-700">Carregando...</span>
+          <button className="flex items-center space-x-2 px-3 py-1.5 border border-brand-200 rounded-lg bg-brand-50 text-xs">
+            <Cpu className="w-3.5 h-3.5 text-brand-600" />
+            <span className="text-brand-700">Carregando...</span>
           </button>
         </div>
         <div className="relative" ref={formatRef}>
-          <button className="flex items-center space-x-2 px-3 py-1.5 border border-blue-200 rounded-lg bg-blue-50 text-xs">
-            <FileText className="w-3.5 h-3.5 text-blue-600" />
-            <span className="text-blue-700">...</span>
+          <button className="flex items-center space-x-2 px-3 py-1.5 border border-brand-200 rounded-lg bg-brand-50 text-xs">
+            <FileText className="w-3.5 h-3.5 text-brand-600" />
+            <span className="text-brand-700">...</span>
           </button>
         </div>
       </div>
@@ -140,15 +140,15 @@ const TranscriptionProviderSelector: React.FC<TranscriptionProviderSelectorProps
     <div className="mb-2 flex items-center gap-3">
       <div className="relative" ref={modelRef}>
         <button 
-          className="flex items-center space-x-2 px-3 py-1.5 border border-blue-200 rounded-lg bg-blue-50 hover:bg-blue-100 transition-colors text-xs"
+          className="flex items-center space-x-2 px-3 py-1.5 border border-brand-200 rounded-lg bg-brand-50 hover:bg-brand-100 transition-colors text-xs"
           onClick={() => {
             setModelOpen(!modelOpen);
             setFormatOpen(false);
           }}
         >
-          <Cpu className="w-3.5 h-3.5 text-blue-600" />
-          <span className="text-blue-700 font-medium">{getSelectedModelDisplay()}</span>
-          <ChevronDown className={`w-3.5 h-3.5 text-blue-600 transition-transform ${modelOpen ? 'rotate-180' : ''}`} />
+          <Cpu className="w-3.5 h-3.5 text-brand-600" />
+          <span className="text-brand-700 font-medium">{getSelectedModelDisplay()}</span>
+          <ChevronDown className={`w-3.5 h-3.5 text-brand-600 transition-transform ${modelOpen ? 'rotate-180' : ''}`} />
         </button>
         
         {modelOpen && (
@@ -163,13 +163,13 @@ const TranscriptionProviderSelector: React.FC<TranscriptionProviderSelectorProps
                     key={`${provider.id}-${model.id}`}
                     className={`w-full px-3 py-2 text-left hover:bg-gray-50 transition-colors ${
                       selectedProvider === provider.id && selectedModel === model.id
-                        ? 'bg-blue-50'
+                        ? 'bg-brand-50'
                         : ''
                     }`}
                     onClick={() => handleModelSelection(provider, model)}
                   >
                     <div className="flex flex-col">
-                      <span className={`text-xs ${selectedProvider === provider.id && selectedModel === model.id ? 'text-blue-700 font-medium' : 'text-gray-900'}`}>
+                      <span className={`text-xs ${selectedProvider === provider.id && selectedModel === model.id ? 'text-brand-700 font-medium' : 'text-gray-900'}`}>
                         {model.name}
                       </span>
                       {model.description && (
@@ -186,15 +186,15 @@ const TranscriptionProviderSelector: React.FC<TranscriptionProviderSelectorProps
 
       <div className="relative" ref={formatRef}>
         <button 
-          className="flex items-center space-x-2 px-3 py-1.5 border border-blue-200 rounded-lg bg-blue-50 hover:bg-blue-100 transition-colors text-xs"
+          className="flex items-center space-x-2 px-3 py-1.5 border border-brand-200 rounded-lg bg-brand-50 hover:bg-brand-100 transition-colors text-xs"
           onClick={() => {
             setFormatOpen(!formatOpen);
             setModelOpen(false);
           }}
         >
-          <FileText className="w-3.5 h-3.5 text-blue-600" />
-          <span className="text-blue-700 font-medium">{getSelectedFormatDisplay()}</span>
-          <ChevronDown className={`w-3.5 h-3.5 text-blue-600 transition-transform ${formatOpen ? 'rotate-180' : ''}`} />
+          <FileText className="w-3.5 h-3.5 text-brand-600" />
+          <span className="text-brand-700 font-medium">{getSelectedFormatDisplay()}</span>
+          <ChevronDown className={`w-3.5 h-3.5 text-brand-600 transition-transform ${formatOpen ? 'rotate-180' : ''}`} />
         </button>
         
         {formatOpen && (
@@ -203,7 +203,7 @@ const TranscriptionProviderSelector: React.FC<TranscriptionProviderSelectorProps
               <button
                 key={format}
                 className={`w-full px-3 py-2 text-left hover:bg-gray-50 transition-colors ${
-                  selectedFormat === format ? 'bg-blue-50 text-blue-700' : 'text-gray-900'
+                  selectedFormat === format ? 'bg-brand-50 text-brand-700' : 'text-gray-900'
                 } ${index === 0 ? 'rounded-t-lg' : ''} ${index === OUTPUT_FORMATS.length - 1 ? 'rounded-b-lg' : ''}`}
                 onClick={() => {
                   onFormatChange(format);
