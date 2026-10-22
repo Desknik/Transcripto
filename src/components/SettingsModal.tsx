@@ -122,12 +122,27 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ onClose, onChanged, onCle
 
           {/* Idioma */}
           <div className={section}>
-            <h3 className="flex items-center gap-2 text-sm font-semibold text-gray-900 mb-3"><Languages className="w-4 h-4" /> Idioma</h3>
+            <h3 className="flex items-center gap-2 text-sm font-semibold text-gray-900 mb-3"><Languages className="w-4 h-4" /> Idioma e saída</h3>
             <label className={label}>Idioma do áudio</label>
             <select className={input} value={settings.language} onChange={e => update({ language: e.target.value })}>
               {LANGUAGES.map(l => <option key={l.code} value={l.code}>{l.name}</option>)}
             </select>
             <p className="text-[11px] text-gray-500 mt-1">Vale para o motor local e para a OpenAI.</p>
+
+            <label className="flex items-start gap-2 mt-4 text-sm text-gray-800">
+              <input
+                type="checkbox" className="mt-1"
+                checked={settings.includeTimestamps}
+                onChange={e => update({ includeTimestamps: e.target.checked })}
+              />
+              <span>
+                Incluir o tempo da fala no texto
+                <span className="block text-[11px] text-gray-500">
+                  Desligado (padrão): só o texto, em parágrafos. Ligado: cada trecho vem como [início -&gt; fim] em segundos.
+                  Vale para novas transcrições e novos formatos gerados; SRT e VTT sempre têm tempo.
+                </span>
+              </span>
+            </label>
           </div>
 
           {/* Motor local */}

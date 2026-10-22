@@ -96,7 +96,7 @@ export function useProcessingQueue() {
         if (!window.electronAPI) return { success: false, error: 'API não disponível' };
         try {
           const r = await window.electronAPI.transcribeAudio({ filePath, provider: p.provider, model: p.model, outputFormat });
-          if (r.success && r.text) return { success: true, text: r.text, language: r.language, duration: r.duration };
+          if (r.success && r.text) return { success: true, text: r.text, language: r.language, duration: r.duration, speechSeconds: r.speechSeconds };
           return { success: false, error: r.error || 'Erro desconhecido' };
         } catch (e) {
           return { success: false, error: e instanceof Error ? e.message : 'Erro de conexão' };
@@ -184,6 +184,8 @@ export function useProcessingQueue() {
               activeFormat: format,
               language: result.language || 'pt-BR',
               duration: result.duration ? formatDuration(result.duration) : undefined,
+              durationSeconds: result.duration,
+              speechSeconds: result.speechSeconds,
               uploadedAt: new Date(),
               originalPath: item.originalFile.name,
               convertedPath: item.audioPath,

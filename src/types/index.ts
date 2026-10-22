@@ -9,6 +9,9 @@ export interface TranscriptionFile {
   activeFormat: OutputFormat;
   language?: string;
   duration?: string;
+  /** Duração total e tempo efetivo de fala, em segundos (ausentes em transcrições antigas) */
+  durationSeconds?: number;
+  speechSeconds?: number;
   uploadedAt: Date;
   originalPath?: string;
   convertedPath?: string;

@@ -10,6 +10,7 @@ export interface ManagerDeps {
   getOpenAIKey: () => string | null;
   /** Idioma configurado, para requisições que não trazem o seu ('auto' → undefined) */
   getLanguage: () => string | undefined;
+  getIncludeTimestamps: () => boolean;
 }
 
 export class TranscriptionServiceManager {
@@ -54,6 +55,10 @@ export class TranscriptionServiceManager {
       };
     }
 
-    return service.transcribe({ ...request, language: request.language ?? this.deps.getLanguage() });
+    return service.transcribe({
+      ...request,
+      language: request.language ?? this.deps.getLanguage(),
+      includeTimestamps: request.includeTimestamps ?? this.deps.getIncludeTimestamps(),
+    });
   }
 }

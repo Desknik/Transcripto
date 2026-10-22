@@ -1,6 +1,7 @@
 import OpenAI from 'openai';
 import fs from 'fs';
 import { BaseTranscriptionService } from './base';
+import { formatTranscript, speechSeconds } from './formatter';
 import { TranscriptionRequest, TranscriptionResponse, TranscriptionProvider } from '../../types/transcription';
 
 export class OpenAITranscriptionService extends BaseTranscriptionService {
@@ -34,35 +35,32 @@ export class OpenAITranscriptionService extends BaseTranscriptionService {
 
       console.log('Starting OpenAI transcription for:', request.filePath);
 
-      const format = request.outputFormat || 'verbose_json';
+      // Sempre pede verbose_json (traz os trechos com tempo) e formata aqui, como no motor local
       const transcription = await this.openai.audio.transcriptions.create({
         file: fs.createReadStream(request.filePath),
         model: request.model || 'whisper-1',
-        response_format: format,
+        response_format: 'verbose_json',
         language: request.language || undefined,
-      }) as any;
+      }) as unknown as { language?: string; duration?: number; text: string; segments?: { start: number; end: number; text: string }[] };
 
       console.log('OpenAI transcription completed successfully');
 
-      let text: string;
-      let language = request.language;
-      let duration: number | undefined;
-
-      if (format === 'json' || format === 'verbose_json') {
-        // For JSON formats, return the full JSON string
-        text = JSON.stringify(transcription, null, 2);
-        language = transcription.language || request.language;
-        duration = transcription.duration;
-      } else {
-        // For text/srt/vtt, the response is a string
-        text = transcription;
-      }
+      const duration = transcription.duration ?? 0;
+      const segments = (transcription.segments ?? [{ start: 0, end: duration, text: transcription.text }])
+        .map(seg => ({ start: seg.start, end: seg.end, text: seg.text.trim() }));
+      const language = transcription.language || request.language;
+      const text = formatTranscript(
+        { segments, duration, language },
+        request.outputFormat || 'text',
+        { includeTimestamps: request.includeTimestamps ?? false },
+      );
 
       return {
         success: true,
         text,
         language,
         duration,
+        speechSeconds: speechSeconds(segments, duration),
       };    } catch (error) {
       console.error('OpenAI transcription error:', error);
       
@@ -71,7 +69,7 @@ export class OpenAITranscriptionService extends BaseTranscriptionService {
       if (error instanceof Error) {
         // Check for specific OpenAI API errors
         if (error.message.includes('401') || error.message.includes('Invalid API key') || error.message.includes('Unauthorized')) {
-          errorMessage = 'API key inválida. Verifique sua chave OpenAI no arquivo .env';
+          errorMessage = 'API key inválida. Verifique sua chave OpenAI em Configurações';
         } else if (error.message.includes('402') || error.message.includes('quota')) {
           errorMessage = 'Quota excedida. Verifique seu limite de uso da API OpenAI';
         } else if (error.message.includes('429') || error.message.includes('rate limit')) {
@@ -104,7 +102,7 @@ export class OpenAITranscriptionService extends BaseTranscriptionService {
       let errorMessage = 'Erro ao conectar com a API OpenAI';
       if (error instanceof Error) {
         if (error.message.includes('401') || error.message.includes('Invalid API key') || error.message.includes('Unauthorized')) {
-          errorMessage = 'API key inválida. Verifique sua chave OpenAI no arquivo .env';
+          errorMessage = 'API key inválida. Verifique sua chave OpenAI em Configurações';
         } else if (error.message.includes('402') || error.message.includes('quota')) {
           errorMessage = 'Quota excedida. Verifique seu limite de uso da API OpenAI';
         } else {

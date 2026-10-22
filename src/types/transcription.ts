@@ -31,6 +31,8 @@ export interface TranscriptionRequest {
   model: string;
   language?: string;
   outputFormat?: OutputFormat;
+  /** Texto com [início -> fim] por trecho; padrão: só o texto */
+  includeTimestamps?: boolean;
 }
 
 export interface TranscriptionResponse {
@@ -39,6 +41,8 @@ export interface TranscriptionResponse {
   error?: string;
   language?: string;
   duration?: number;
+  /** Tempo efetivo de fala (s), somando só os trechos com voz */
+  speechSeconds?: number;
 }
 
 export const FORMAT_LABELS: Record<OutputFormat, string> = {

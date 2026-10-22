@@ -19,6 +19,7 @@ export function getSettings(): AppSettings {
     device: store.get('device'),
     idleMinutes: store.get('idleMinutes'),
     fallbackToOpenAI: store.get('fallbackToOpenAI'),
+    includeTimestamps: store.get('includeTimestamps'),
   }
 }
 

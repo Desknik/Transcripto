@@ -106,6 +106,16 @@ const TranscriptionPanel: React.FC<TranscriptionPanelProps> = ({
   const existingFormats = transcriptions.map(t => t.format);
   const availableFormatsToGenerate = AVAILABLE_FORMATS.filter(f => !existingFormats.includes(f));
 
+  // Fala efetiva x duração total (só em transcrições novas, que guardam os tempos)
+  const hasSpeechStats = file.speechSeconds != null && !!file.durationSeconds;
+  const silencePercent = hasSpeechStats
+    ? Math.max(0, Math.round((1 - file.speechSeconds! / file.durationSeconds!) * 100))
+    : 0;
+  const formatMinSec = (seconds: number) => {
+    const total = Math.round(seconds);
+    return total >= 60 ? `${Math.floor(total / 60)}m ${String(total % 60).padStart(2, '0')}s` : `${total}s`;
+  };
+
   const getFileIcon = () => {
     const extension = file.name.split('.').pop()?.toLowerCase();
     if (['mp4', 'mov', 'avi', 'mkv'].includes(extension || '')) {
@@ -375,7 +385,7 @@ const TranscriptionPanel: React.FC<TranscriptionPanelProps> = ({
             </div>
             
             {activeTranscription && (
-              <div className="mt-6 grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div className={`mt-6 grid grid-cols-1 gap-4 ${hasSpeechStats ? 'sm:grid-cols-5' : 'sm:grid-cols-3'}`}>
                 <div className="bg-brand-50 rounded-lg p-4 text-center">
                   <div className="text-2xl font-bold text-brand-600">
                     {activeTranscription.content.split(' ').length}
@@ -394,6 +404,18 @@ const TranscriptionPanel: React.FC<TranscriptionPanelProps> = ({
                   </div>
                   <div className="text-sm text-purple-600 font-medium">Min. leitura</div>
                 </div>
+                {hasSpeechStats && (
+                  <>
+                    <div className="bg-cyan-50 rounded-lg p-4 text-center" title="Tempo efetivo de fala, sem os silêncios">
+                      <div className="text-2xl font-bold text-cyan-700">{formatMinSec(file.speechSeconds!)}</div>
+                      <div className="text-sm text-cyan-700 font-medium">Tempo de fala</div>
+                    </div>
+                    <div className="bg-fuchsia-50 rounded-lg p-4 text-center" title="Parte da duração total sem fala">
+                      <div className="text-2xl font-bold text-fuchsia-700">{silencePercent}%</div>
+                      <div className="text-sm text-fuchsia-700 font-medium">Silêncio</div>
+                    </div>
+                  </>
+                )}
               </div>
             )}
           </div>

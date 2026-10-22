@@ -49,6 +49,7 @@ const transcriptionManager = new TranscriptionServiceManager({
   isLocalReady: async () => runtime.isInstalled() && models.isInstalled(getSettings().whisperModel),
   getOpenAIKey,
   getLanguage: () => languageOrUndefined(),
+  getIncludeTimestamps: () => getSettings().includeTimestamps,
 })
 
 // Audio conversion service

@@ -35,8 +35,10 @@ Depois disso a transcrição local funciona offline. Sem GPU NVIDIA o app usa a 
 ### Configurações
 
 - **Idioma:** português por padrão; escolha outro idioma ou "detectar automaticamente" (vale para o local e a OpenAI).
+- **Saída:** por padrão só o texto, agrupado em parágrafos (quebra na troca de locutor, em pausas longas ou textos muito longos). Opcionalmente inclui o tempo de cada trecho, como `[0.46s -> 2.90s] texto`.
 - **Motor local:** reparar/atualizar a instalação, dispositivo (automático, GPU, CPU) e ociosidade do servidor.
 - **Modelos:** baixar, usar e remover modelos (tiny, base, small, medium, large-v3-turbo, large-v3).
+- **Dados:** botão para apagar todo o histórico de transcrições de uma vez.
 - **OpenAI (opcional):** chave da API (testada antes de salvar e guardada criptografada). Marque
   "usar a OpenAI como fallback" para repetir na OpenAI quando o motor local falhar. A cobrança é na sua conta.
 

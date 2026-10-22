@@ -8,10 +8,10 @@ import {
   TranscriptionProvider,
   TranscriptionRequest,
   TranscriptionResponse,
-  OutputFormat,
   LOCAL_WHISPER_PROVIDER_ID,
 } from '../../types/transcription';
 import { AppSettings } from '../../types/settings';
+import { TranscriptData, formatTranscript, speechSeconds } from './formatter';
 
 export const LOCAL_SERVER_PORT = 8765;
 
@@ -22,17 +22,7 @@ export interface LocalWhisperServerStatus {
   startedByApp: boolean;
 }
 
-interface LocalSegment {
-  start: number;
-  end: number;
-  text: string;
-  speaker?: string;
-}
-
-interface LocalResult {
-  segments: LocalSegment[];
-  duration: number;
-  language?: string;
+interface LocalResult extends TranscriptData {
   mode: string;
 }
 
@@ -84,7 +74,7 @@ export class LocalWhisperTranscriptionService extends BaseTranscriptionService {
         { id: 'transcricao', name: `Transcrição (${model})`, description: 'faster-whisper local, sem divisão de arquivo' },
         {
           id: 'diarizado',
-          name: `Diarizada por canal (${model})`,
+          name: `Transcrição por canal (${model})`,
           description: 'Identifica locutores em áudio estéreo; mono usa a transcrição normal',
         },
       ],
@@ -190,9 +180,14 @@ export class LocalWhisperTranscriptionService extends BaseTranscriptionService {
         const result: LocalResult = JSON.parse(fs.readFileSync(outFile, 'utf-8'));
         return {
           success: true,
-          text: this.format(result, request.outputFormat || 'text'),
+          text: formatTranscript(
+            { ...result, language: result.language ?? this.cfg.getSettings().language },
+            request.outputFormat || 'text',
+            { includeTimestamps: request.includeTimestamps ?? this.cfg.getSettings().includeTimestamps },
+          ),
           language: result.language || request.language,
           duration: result.duration,
+          speechSeconds: speechSeconds(result.segments, result.duration),
         };
       } finally {
         fs.rm(outFile, { force: true }, () => undefined);
@@ -225,46 +220,6 @@ export class LocalWhisperTranscriptionService extends BaseTranscriptionService {
     const lines = stderr.trim().split(/\r?\n/).filter(Boolean);
     const erro = [...lines].reverse().find(l => l.startsWith('ERRO:'));
     return (erro ?? lines[lines.length - 1] ?? '').replace(/^ERRO:\s*/, '');
-  }
-
-  // ------------------------------------------------------------------ formatos de saída
-
-  private label(s: LocalSegment): string {
-    return s.speaker ? `${s.speaker}: ${s.text}` : s.text;
-  }
-
-  private timestamp(seconds: number, sep: ',' | '.'): string {
-    const ms = Math.round(seconds * 1000);
-    const pad = (n: number, w = 2) => String(n).padStart(w, '0');
-    return `${pad(Math.floor(ms / 3_600_000))}:${pad(Math.floor(ms / 60_000) % 60)}:${pad(Math.floor(ms / 1000) % 60)}${sep}${pad(ms % 1000, 3)}`;
-  }
-
-  private format(result: LocalResult, format: OutputFormat): string {
-    const segs = result.segments;
-    const text = segs.map(s => this.label(s)).join('\n');
-
-    switch (format) {
-      case 'srt':
-        return segs
-          .map((s, i) => `${i + 1}\n${this.timestamp(s.start, ',')} --> ${this.timestamp(s.end, ',')}\n${this.label(s)}\n`)
-          .join('\n');
-      case 'vtt':
-        return 'WEBVTT\n\n' + segs
-          .map(s => `${this.timestamp(s.start, '.')} --> ${this.timestamp(s.end, '.')}\n${this.label(s)}\n`)
-          .join('\n');
-      case 'json':
-        return JSON.stringify({ text }, null, 2);
-      case 'verbose_json':
-        return JSON.stringify({
-          task: 'transcribe',
-          language: result.language ?? this.cfg.getSettings().language,
-          duration: result.duration,
-          text,
-          segments: segs.map((s, i) => ({ id: i, ...s })),
-        }, null, 2);
-      default:
-        return text;
-    }
   }
 
   async testConnection(): Promise<{ success: boolean; error?: string }> {

@@ -9,6 +9,8 @@ export interface AppSettings {
   idleMinutes: number;
   /** Se o motor local falhar, repete a transcrição na OpenAI (exige chave) */
   fallbackToOpenAI: boolean;
+  /** Texto com o tempo (início -> fim) de cada trecho de fala; padrão: só o texto */
+  includeTimestamps: boolean;
 }
 
 export const DEFAULT_SETTINGS: AppSettings = {
@@ -17,6 +19,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   device: 'auto',
   idleMinutes: 0,
   fallbackToOpenAI: false,
+  includeTimestamps: false,
 };
 
 export interface WhisperModelInfo {
